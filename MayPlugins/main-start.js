@@ -27,7 +27,7 @@ Un bot con estilo 👻 Hanako-kun y magia kawaii~
 ╭───────────────╮
 ┃ 🧠 Creador: *SoyMaycol*
 ┃ 🎮 Bot: *MaycolAIUltraMD*
-┃ 🗨️ SubBot: ¡Disponible!
+┃ 🗨️ MayBot's: ¡Disponible!
 ╰───────────────╯
 
 ✦ Usa los botones para comenzar tu aventura~
