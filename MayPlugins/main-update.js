@@ -17,32 +17,27 @@ module.exports = (bot) => {
         return bot.sendMessage(chatId, `❌ Error en git pull:\n${stderr}`);
       }
 
-      const changed = stdout.split('\n').filter(line =>
-        line.includes('MayPlugins') &&
-        !line.startsWith(' delete') &&  // 💣 Ignorar borrados
-        line.trim().endsWith('.js')
-      ).map(line => line.trim().split(' ').pop());
+      // Siempre escanea TODOS los comandos de la carpeta MayPlugins
+      const pluginDir = path.resolve(__dirname, '..', 'MayPlugins');
+      const allFiles = fs.readdirSync(pluginDir).filter(f => f.endsWith('.js'));
 
       let reloaded = [];
 
-      changed.forEach(file => {
-        const fullPath = path.resolve(__dirname, '..', file);
+      for (const file of allFiles) {
+        const fullPath = path.join(pluginDir, file);
 
-        // Verifica si el archivo todavía existe
-        if (fs.existsSync(fullPath)) {
+        try {
           delete require.cache[require.resolve(fullPath)];
+          const plugin = require(fullPath);
 
-          try {
-            const cmd = require(fullPath);
-            if (typeof cmd === 'function') {
-              cmd(bot);
-              reloaded.push(file);
-            }
-          } catch (e) {
-            bot.sendMessage(chatId, `⚠️ Error al recargar ${file}:\n${e.message}`);
+          if (typeof plugin === 'function') {
+            plugin(bot);
+            reloaded.push(file);
           }
+        } catch (e) {
+          bot.sendMessage(chatId, `⚠️ Error al recargar ${file}:\n${e.message}`);
         }
-      });
+      }
 
       bot.sendMessage(chatId, `✅ Bot actualizado.\nComandos recargados:\n\`\`\`\n${reloaded.join('\n') || 'Ninguno'}\n\`\`\``);
     });
