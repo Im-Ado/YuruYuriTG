@@ -47,7 +47,7 @@ ${lista}
 
     await bot.sendPhoto(chatId, 'https://files.catbox.moe/vy4bx1.jpeg', {
       caption: decorado,
-      parse_mode: 'MarkdownV2'
+      parse_mode: 'HTML'
     });
   });
 };
