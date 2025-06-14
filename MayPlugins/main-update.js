@@ -6,7 +6,7 @@ module.exports = (bot) => {
   bot.onText(/^\/update$/, async (msg) => {
     const chatId = msg.chat.id;
 
-    if (msg.from.id !== TU_ID_TELEGRAM) {
+    if (msg.from.id !== 7675783113) {
       return bot.sendMessage(chatId, '❌ Solo el creador puede actualizar el bot.');
     }
 
