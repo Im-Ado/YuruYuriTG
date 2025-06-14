@@ -7,7 +7,7 @@ module.exports = (bot) => {
     const chatId = msg.chat.id;
 
     // ✅ OJO: Solo admins o dueños
-    if (msg.from.id !== TU_ID_TELEGRAM) {
+    if (msg.from.id !== 7675783113) {
       return bot.sendMessage(chatId, '❌ Solo el creador puede actualizar el bot.');
     }
 
