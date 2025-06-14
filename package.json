@@ -25,6 +25,8 @@
     "moment-timezone": "^0.6.0",
     "@soymaycol/maytube": "^1.0.7",
     "yt-search": "^2.10.3",
+    "aptoide-scraper": "github:SoySapo6/MayAptoide",
+    "node-fetch": "^3.2.10",
     "node-telegram-bot-api": "^0.66.0"
   }
 }
