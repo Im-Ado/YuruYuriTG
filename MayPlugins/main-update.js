@@ -6,40 +6,45 @@ module.exports = (bot) => {
   bot.onText(/^\/update$/, async (msg) => {
     const chatId = msg.chat.id;
 
-    // ✅ OJO: Solo admins o dueños
-    if (msg.from.id !== 7675783113) {
+    if (msg.from.id !== TU_ID_TELEGRAM) {
       return bot.sendMessage(chatId, '❌ Solo el creador puede actualizar el bot.');
     }
 
-    bot.sendMessage(chatId, '🔄 Actualizando bot desde Git...');
+    bot.sendMessage(chatId, '🔄 Haciendo `git pull`...');
 
     exec('git pull', async (err, stdout, stderr) => {
       if (err) {
-        return bot.sendMessage(chatId, `❌ Error al hacer pull:\n${stderr}`);
+        return bot.sendMessage(chatId, `❌ Error en git pull:\n${stderr}`);
       }
 
       const changed = stdout.split('\n').filter(line =>
-        line.endsWith('.js') && line.includes('MayPlugins')
-      );
+        line.includes('MayPlugins') &&
+        !line.startsWith(' delete') &&  // 💣 Ignorar borrados
+        line.trim().endsWith('.js')
+      ).map(line => line.trim().split(' ').pop());
 
-      // 🔁 Recargar comandos actualizados
+      let reloaded = [];
+
       changed.forEach(file => {
-        const fullPath = path.resolve(__dirname, '..', file.trim());
+        const fullPath = path.resolve(__dirname, '..', file);
 
-        // Eliminar de la caché
-        delete require.cache[require.resolve(fullPath)];
+        // Verifica si el archivo todavía existe
+        if (fs.existsSync(fullPath)) {
+          delete require.cache[require.resolve(fullPath)];
 
-        try {
-          const newCommand = require(fullPath);
-          if (typeof newCommand === 'function') {
-            newCommand(bot); // Reenganchar el comando
+          try {
+            const cmd = require(fullPath);
+            if (typeof cmd === 'function') {
+              cmd(bot);
+              reloaded.push(file);
+            }
+          } catch (e) {
+            bot.sendMessage(chatId, `⚠️ Error al recargar ${file}:\n${e.message}`);
           }
-        } catch (e) {
-          bot.sendMessage(chatId, `⚠️ Error al recargar ${file}:\n${e.message}`);
         }
       });
 
-      bot.sendMessage(chatId, `✅ Bot actualizado!\nArchivos recargados:\n\`\`\`\n${changed.join('\n') || 'Ninguno'}\n\`\`\``);
+      bot.sendMessage(chatId, `✅ Bot actualizado.\nComandos recargados:\n\`\`\`\n${reloaded.join('\n') || 'Ninguno'}\n\`\`\``);
     });
   });
 };
