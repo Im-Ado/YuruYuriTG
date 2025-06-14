@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 module.exports = (bot) => {
-  bot.onText(/^\/menucompleto$/, async (msg) => {
+  bot.onText(/♥ Menú Completo ♥/, async (msg) => {
     const chatId = msg.chat.id;
     const pluginsPath = path.join(__dirname);
     const comandos = new Set();
