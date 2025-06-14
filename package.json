@@ -23,6 +23,7 @@
   "homepage": "https://github.com/SoySapo6/MaycolAIUltraMD-Telegram#readme",
   "dependencies": {
     "moment-timezone": "^0.6.0",
+    "@soymaycol/maytube": "^1.0.7",
     "node-telegram-bot-api": "^0.66.0"
   }
 }
