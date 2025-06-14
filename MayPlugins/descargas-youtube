@@ -1,0 +1,74 @@
+const yts = require('yt-search');
+const { yta, ytv } = require('@soymaycol/maytube');
+const fetch = require('node-fetch'); // si usas Node.js < 18
+const limit = 100; // MB
+
+module.exports = (bot) => {
+  // AUDIO
+  bot.onText(/^\/playaudio (.+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const query = match[1];
+
+    bot.sendMessage(chatId, '🔍 Buscando audio en YouTube...');
+
+    try {
+      const res = await yts(query);
+      if (!res?.all?.length) return bot.sendMessage(chatId, '❌ No encontré resultados.');
+
+      const video = res.all[0];
+      const info = `🎵 *${video.title}*\n📺 Canal: ${video.author.name}\n🕒 Duración: ${video.duration.timestamp}\n🔗 ${video.url}`;
+      await bot.sendMessage(chatId, `⏳ Descargando audio...\n\n${info}`, { parse_mode: "Markdown" });
+
+      const result = await yta(video.url);
+      if (!result?.result?.download) throw new Error("Error al obtener el enlace de audio");
+
+      await bot.sendAudio(chatId, result.result.download, {
+        caption: `🎶 ${result.result.title || video.title}`,
+      });
+    } catch (e) {
+      console.error(e);
+      bot.sendMessage(chatId, `❌ Error:\n${e.message}`);
+    }
+  });
+
+  // VIDEO
+  bot.onText(/^\/playvideo (.+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const query = match[1];
+
+    bot.sendMessage(chatId, '🔍 Buscando video en YouTube...');
+
+    try {
+      const res = await yts(query);
+      if (!res?.all?.length) return bot.sendMessage(chatId, '❌ No encontré resultados.');
+
+      const video = res.all[0];
+      const info = `📹 *${video.title}*\n📺 Canal: ${video.author.name}\n🕒 Duración: ${video.duration.timestamp}\n🔗 ${video.url}`;
+      await bot.sendMessage(chatId, `⏳ Descargando video...\n\n${info}`, { parse_mode: "Markdown" });
+
+      const result = await ytv(video.url);
+      if (!result?.url) throw new Error("Error al obtener el enlace de video");
+
+      // Revisar tamaño
+      let sizemb = 0;
+      try {
+        const head = await fetch(result.url, { method: 'HEAD' });
+        const size = head.headers.get('content-length');
+        if (size) sizemb = parseInt(size) / (1024 * 1024);
+      } catch (e) {
+        console.log("⚠️ No se pudo obtener el tamaño del video");
+      }
+
+      if (sizemb > limit) {
+        return bot.sendMessage(chatId, `🚫 El video pesa ${sizemb.toFixed(2)}MB. El límite es ${limit}MB.`);
+      }
+
+      await bot.sendVideo(chatId, result.url, {
+        caption: `🎬 ${result.title || video.title}`,
+      });
+    } catch (e) {
+      console.error(e);
+      bot.sendMessage(chatId, `❌ Error:\n${e.message}`);
+    }
+  });
+};
