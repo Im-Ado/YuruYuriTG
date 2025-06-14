@@ -1,0 +1,27 @@
+{
+  "name": "maycolaiultramd",
+  "version": "1.0.0",
+  "description": "El bot mas avanzado ahora en telegram!",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SoySapo6/MaycolAIUltraMD-Telegram.git"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "MaycolAIUltraMD"
+  ],
+  "author": "SoyMaycol",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SoySapo6/MaycolAIUltraMD-Telegram/issues"
+  },
+  "homepage": "https://github.com/SoySapo6/MaycolAIUltraMD-Telegram#readme",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
