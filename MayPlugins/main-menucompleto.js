@@ -5,27 +5,30 @@ module.exports = (bot) => {
   bot.onText(/♥ Menú Completo ♥/, async (msg) => {
     const chatId = msg.chat.id;
     const pluginsPath = path.join(__dirname);
-    const comandos = new Set();
+    const categorias = {};
 
-    // Leer todos los comandos registrados
     fs.readdirSync(pluginsPath).forEach(file => {
       if (!file.endsWith('.js') || file === 'menucompleto.js') return;
 
-      const code = fs.readFileSync(path.join(pluginsPath, file), 'utf-8');
-      const matches = [...code.matchAll(/bot\.onText\s*\/\^\s*\\\/(\w+)[^)]*/g)];
+      const fileName = file.replace('.js', '');
+      const [tag, comando] = fileName.split('-');
 
-      for (const match of matches) {
-        comandos.add(`/${match[1]}`);
-      }
+      if (!tag || !comando) return;
+
+      if (!categorias[tag]) categorias[tag] = [];
+      categorias[tag].push(`/${comando}`);
     });
 
-    if (comandos.size === 0) {
+    if (Object.keys(categorias).length === 0) {
       return bot.sendMessage(chatId, '💀 No encontré ni un comando... Hanako está decepcionado...');
     }
 
-    const lista = [...comandos].sort().map(cmd => `✦ ✧ ⛧ ${cmd} ⛧ ✧ ✦`).join('\n');
+    let lista = '';
+    for (const tag in categorias) {
+      lista += `\n🌸 *${tag.toUpperCase()}*\n`;
+      lista += categorias[tag].map(cmd => `✦ ✧ ⛧ ${cmd} ⛧ ✧ ✦`).join('\n') + '\n';
+    }
 
-    // Texto decorado estilo Hanako-kun 👻
     const decorado = `
 ╔════════════════════════╗
    🌸 *𝕄𝕖𝕟𝕦́ 𝕄𝕒𝕝𝕕𝕚𝕥𝕠 𝕕𝕖 𝕄𝕒𝕪𝕓𝕠𝕥* 👻
@@ -42,7 +45,6 @@ ${lista}
 ❀ ༘⋆*ೃ˚ Hanako te bendice con papel higiénico 🌸🧻
 `;
 
-    // Enviar imagen + menú
     await bot.sendPhoto(chatId, 'https://files.catbox.moe/vy4bx1.jpeg', {
       caption: decorado,
       parse_mode: 'Markdown'
