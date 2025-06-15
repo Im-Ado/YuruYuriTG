@@ -1,7 +1,7 @@
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const crypto = require('crypto');
 const { FormData, Blob } = require('formdata-node');
-const { fileTypeFromBuffer } = require('file-type');
+const fileType = require('file-type');
 
 module.exports = (bot) => {
   bot.onText(/^\/catbox$/, async (msg) => {
@@ -15,7 +15,6 @@ module.exports = (bot) => {
     }
 
     try {
-      // Obtener el file_id de distintos tipos de media
       const fileId =
         reply.document?.file_id ||
         reply.photo?.at(-1)?.file_id ||
@@ -27,19 +26,11 @@ module.exports = (bot) => {
         });
       }
 
-      // Obtener el enlace directo del archivo
-      const fileLink = await bot.getFileLink(fileId);
-      const fileUrl = typeof fileLink === 'string' ? fileLink : fileLink?.href;
-
-      if (!fileUrl) {
-        throw new Error("❌ No se pudo obtener el enlace del archivo.");
-      }
-
+      const fileUrl = await bot.getFileLink(fileId); // ✅ Ya es string
       const res = await fetch(fileUrl);
-      const buffer = await res.buffer();
+      const buffer = Buffer.from(await res.arrayBuffer()); // ⚠️ Usa arrayBuffer en lugar de .buffer()
 
-      // Detectar tipo de archivo
-      const type = await fileTypeFromBuffer(buffer);
+      const type = await fileType.fileTypeFromBuffer(buffer);
       if (!type) throw new Error("❌ No se pudo detectar el tipo del archivo.");
 
       const isMedia = /image\/(png|jpe?g|gif)|video\/mp4/.test(type.mime);
@@ -58,14 +49,13 @@ module.exports = (bot) => {
 
     } catch (e) {
       console.error('[CatBox Error]', e);
-      bot.sendMessage(chatId, `❌ Hubo un error al subir a CatBox.`, {
+      bot.sendMessage(chatId, `❌ Error al subir a CatBox. ¿Me das otra oportunidad? (⁠｡⁠•́⁠︿⁠•̀⁠｡⁠)`, {
         reply_to_message_id: msg.message_id
       });
     }
   });
 };
 
-// 🧠 Subir buffer a CatBox
 async function subirACatbox(content, type) {
   const { ext, mime } = type;
   const blob = new Blob([content], { type: mime });
@@ -86,10 +76,9 @@ async function subirACatbox(content, type) {
   return await res.text();
 }
 
-// 🧮 Convertir bytes a KB/MB/etc.
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B';
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / (1024 ** i)).toFixed(2)} ${sizes[i]}`;
-                                }
+}
