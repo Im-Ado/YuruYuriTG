@@ -36,16 +36,16 @@ module.exports = (bot) => {
       // Validar que la URL sea accesible
       let sizemb = 0;
       let isValidUrl = false;
-      
+
       try {
-        const res = await fetch(api.url, { 
+        const res = await fetch(api.url, {
           method: "HEAD",
-          timeout: 10000, // 10 segundos de timeout
+          timeout: 10000,
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
           }
         });
-        
+
         if (res.ok) {
           isValidUrl = true;
           const length = res.headers.get("content-length");
@@ -64,42 +64,36 @@ module.exports = (bot) => {
         return bot.sendMessage(chatId, `🚫 El archivo pesa ${sizemb.toFixed(2)} MB. Límite: ${LIMIT_MB} MB. Usa otro video 🎬`);
       }
 
-      // Sanitizar el nombre del archivo
-      const cleanTitle = video.title.replace(/[^\w\s\-_.]/gi, "").substring(0, 50);
-      
-      // Intentar enviar el video con opciones adicionales
+      // Sanitizar el nombre del archivo (aunque no se usará directamente)
+      const cleanTitle = video.title.replace(/[^\w\s\-_.]/gi, "").replace(/\s+/g, "_").substring(0, 40);
+
+      // Intentar enviar el video desde la URL
       try {
         await bot.sendVideo(chatId, api.url, {
-          caption: `🎬 *${api.title || video.title}*`,
-          parse_mode: "HTML",
-          filename: `${cleanTitle}.mp4`,
+          caption: `🎬 ${api.title || video.title}`,
           supports_streaming: true
         });
       } catch (videoError) {
         console.error("Error enviando video:", videoError);
-        console.log("Revisa la configuración del modulo @soymaycol/maytelegram");
-        
+
         // Alternativa: enviar como documento
         try {
           await bot.sendDocument(chatId, api.url, {
-            caption: `🎬 *${api.title || video.title}*\n\n📁 Enviado como archivo debido a restricciones`,
-            parse_mode: "HTML",
-            filename: `${cleanTitle}.mp4`
+            caption: `🎬 ${api.title || video.title}\n\n📁 Enviado como archivo debido a restricciones`
           });
         } catch (docError) {
           console.error("Error enviando documento:", docError);
-          
+
           // Última alternativa: enviar solo el enlace
-          await bot.sendMessage(chatId, 
-            `❌ No se pudo enviar el video directamente.\n\n🔗 Enlace del video:\n${api.url}\n\n💡 Puedes descargar manualmente desde este enlace.`,
-            { parse_mode: "HTML" }
+          await bot.sendMessage(chatId,
+            `❌ No se pudo enviar el video directamente.\n\n🔗 Enlace del video:\n${api.url}\n\n💡 Puedes descargarlo manualmente desde ese enlace.`
           );
         }
       }
 
     } catch (err) {
       console.error("Error general:", err);
-      
+
       // Mensajes de error más específicos
       if (err.message.includes("ETELEGRAM")) {
         bot.sendMessage(chatId, "❌ Error de Telegram: No se pudo procesar el video. El enlace puede estar caducado o no ser compatible.");
