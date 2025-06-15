@@ -1,7 +1,7 @@
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const crypto = require('crypto');
 const { FormData, Blob } = require('formdata-node');
-const fileType = require('file-type');
+const fileType = (...args) => import('file-type').then(({default: ft}) => ft(...args));
 
 module.exports = (bot) => {
   bot.onText(/^\/catbox$/, async (msg) => {
