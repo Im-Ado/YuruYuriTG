@@ -1,6 +1,6 @@
 const yts = require("yt-search");
 const { ytv } = require("@soymaycol/maytube");
-const fetch = require("node-fetch");
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const crypto = require("crypto");
 const { Blob } = require("formdata-node");
 const { FormData } = require("formdata-node");
