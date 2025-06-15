@@ -2,7 +2,7 @@ const { search, download } = require('aptoide-scraper');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const crypto = require("crypto");
 const { FormData, Blob } = require("formdata-node");
-const { fileTypeFromBuffer } = require("file-type");
+const fileType = require("file-type");
 
 const emoji = '📦';
 const emoji2 = '🚫';
@@ -36,14 +36,15 @@ module.exports = (bot) => {
       await bot.sendPhoto(chatId, data5.icon, { caption: txt });
 
       if (data5.size.includes('GB') || parseFloat(data5.size.replace(' MB', '')) > 999) {
-        return await bot.sendMessage(chatId, `${emoji2} El archivo es demasiado pesado para enviar directo. Subiendo a CatBox...`);
+        await bot.sendMessage(chatId, `${emoji2} El archivo es muy pesado. Subiéndolo a CatBox...`);
       }
 
       const res = await fetch(data5.dllink);
-      const buffer = await res.buffer();
+      const arrayBuffer = await res.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
 
       const url = await subirACatbox(buffer);
-      await bot.sendMessage(chatId, `✅ APK subida a CatBox:\n📦 ${url}`);
+      await bot.sendMessage(chatId, `${done} APK subida a CatBox:\n🔗 ${url}`);
     } catch (err) {
       console.error(err);
       await bot.sendMessage(chatId, `${error} Ocurrió un fallo inesperado al descargar la APK.`);
@@ -51,10 +52,14 @@ module.exports = (bot) => {
   });
 };
 
-// Función para subir a CatBox
+// 🐱‍👤 Subida a CatBox sin errores
 async function subirACatbox(content) {
-  const { ext, mime } = (await fileTypeFromBuffer(content)) || { ext: 'apk', mime: 'application/vnd.android.package-archive' };
-  const blob = new Blob([content.toArrayBuffer()], { type: mime });
+  const { ext, mime } = (await fileType.fileTypeFromBuffer(content)) || {
+    ext: 'apk',
+    mime: 'application/vnd.android.package-archive',
+  };
+
+  const blob = new Blob([content], { type: mime });
   const formData = new FormData();
   const randomName = crypto.randomBytes(5).toString("hex");
 
@@ -69,6 +74,5 @@ async function subirACatbox(content) {
     },
   });
 
-  const url = await res.text();
-  return url;
+  return await res.text();
 }
