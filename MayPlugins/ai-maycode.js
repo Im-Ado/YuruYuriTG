@@ -1,5 +1,5 @@
 const axios = require('axios');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fetch = require('node-fetch');
 const crypto = require('crypto');
 const FormData = require('form-data');
 const fs = require('fs');
