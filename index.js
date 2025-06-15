@@ -44,21 +44,15 @@ ${colors.reset}
 // Sistema Anti-Spam Global
 class AntiSpamSystem {
     constructor() {
-        // Configuración del sistema anti-spam
-        this.config = {
-            maxMessagesPerUser: 3,          // Máximo 5 mensajes por usuario
-            timeWindow: 15000,              // En ventana de 15 segundos
-            globalCooldown: 1000,           // 1 segundo entre respuestas del bot
-            userCooldown: 8000,             // 8 segundos de cooldown por usuario tras spam
-            maxConsecutiveMessages: 4,       // Máximo 4 mensajes consecutivos del bot
-            consecutiveTimeWindow: 5000,     // Ventana de 5 segundos para mensajes consecutivos
-            emergencyBypass: 3000,          // Tiempo para bypass de emergencia
-            priorityMethods: [              // Métodos que tienen prioridad
-                'answerCallbackQuery',
-                'editMessageText',
-                'editMessageCaption'
-            ]
-        };
+        
+    this.config = {
+    maxMessagesPerUser: 4,          // Toleramos un poco más antes de saltar (4 mensajes)
+    timeWindow: 8000,               // En 8 segundos (más ajustado pero justo)
+    globalCooldown: 1500,           // 1.5s entre respuestas del bot, más fluido
+    userCooldown: 7000,             // Castigamos al spammer con 7s de espera
+    maxConsecutiveMessages: 2,      // Bot solo puede responder 2 veces seguidas
+    consecutiveTimeWindow: 4000     // En 4s, evita que el bot explote en respuestas
+    };
         
         // Tracking de usuarios
         this.userMessages = new Map();      // userId -> [{timestamp, messageId}, ...]
@@ -66,13 +60,11 @@ class AntiSpamSystem {
         this.lastBotMessage = 0;            // Timestamp del último mensaje del bot
         this.botConsecutiveMessages = [];   // Array de timestamps de mensajes consecutivos del bot
         this.processedMessages = new Set(); // Set de messageIds ya procesados
-        this.emergencyBypass = new Map();   // chatId -> timestamp para bypass de emergencia
-        this.botMessageQueue = new Map();   // chatId -> Array de mensajes en cola
         
         // Limpiar datos antiguos cada 30 segundos
         setInterval(() => this.cleanup(), 30000);
         
-        log('🛡️ Sistema Anti-Spam inicializado (Versión Mejorada)', 'green');
+        log('🛡️ Sistema Anti-Spam inicializado', 'green');
     }
     
     // Verificar si un usuario está en spam
@@ -129,108 +121,34 @@ class AntiSpamSystem {
     }
     
     // Verificar si el bot debe esperar antes de responder
-    shouldBotWait(method = '', chatId = null) {
+    shouldBotWait() {
         const now = Date.now();
         
-        // Métodos prioritarios pueden saltarse algunas restricciones
-        const isPriorityMethod = this.config.priorityMethods.includes(method);
-        
-        // Verificar bypass de emergencia para el chat
-        if (chatId && this.emergencyBypass.has(chatId)) {
-            const bypassEnd = this.emergencyBypass.get(chatId);
-            if (now < bypassEnd) {
-                log(`🚀 Bypass de emergencia activo para chat ${chatId}`, 'cyan');
-                return false;
-            } else {
-                this.emergencyBypass.delete(chatId);
-            }
-        }
-        
-        // Los métodos prioritarios tienen cooldown reducido
-        const cooldownTime = isPriorityMethod ? this.config.globalCooldown / 2 : this.config.globalCooldown;
-        
         // Verificar cooldown global
-        if (now - this.lastBotMessage < cooldownTime) {
-            const remaining = Math.ceil((cooldownTime - (now - this.lastBotMessage)) / 1000);
-            if (!isPriorityMethod) {
-                log(`⏳ Bot en cooldown global (${remaining}s) - Método: ${method}`, 'yellow');
-                return true;
-            }
+        if (now - this.lastBotMessage < this.config.globalCooldown) {
+            const remaining = Math.ceil((this.config.globalCooldown - (now - this.lastBotMessage)) / 1000);
+            log(`⏳ Bot en cooldown global (${remaining}s)`, 'yellow');
+            return true;
         }
         
-        // Verificar mensajes consecutivos del bot (más flexible para métodos prioritarios)
+        // Verificar mensajes consecutivos del bot
         const windowStart = now - this.config.consecutiveTimeWindow;
         this.botConsecutiveMessages = this.botConsecutiveMessages.filter(ts => ts > windowStart);
         
-        const maxConsecutive = isPriorityMethod ? this.config.maxConsecutiveMessages * 2 : this.config.maxConsecutiveMessages;
-        
-        if (this.botConsecutiveMessages.length >= maxConsecutive) {
-            log(`🚫 Bot ha enviado demasiados mensajes consecutivos (${this.botConsecutiveMessages.length}/${maxConsecutive})`, 'yellow');
+        if (this.botConsecutiveMessages.length >= this.config.maxConsecutiveMessages) {
+            log(`🚫 Bot ha enviado demasiados mensajes consecutivos`, 'yellow');
             return true;
         }
         
         return false;
     }
     
-    // Activar bypass de emergencia para un chat específico
-    activateEmergencyBypass(chatId, duration = null) {
-        const bypassDuration = duration || this.config.emergencyBypass;
-        const now = Date.now();
-        this.emergencyBypass.set(chatId, now + bypassDuration);
-        log(`🚨 Bypass de emergencia activado para chat ${chatId} por ${bypassDuration/1000}s`, 'green');
-    }
-    
     // Registrar que el bot envió un mensaje
-    recordBotMessage(method = '') {
+    recordBotMessage() {
         const now = Date.now();
         this.lastBotMessage = now;
         this.botConsecutiveMessages.push(now);
-        log(`📤 Mensaje del bot registrado: ${method}`, 'cyan');
-    }
-    
-    // Crear cola de mensajes para evitar bloqueos
-    async queueBotMessage(chatId, messageFunc) {
-        const chatKey = chatId.toString();
-        
-        if (!this.botMessageQueue.has(chatKey)) {
-            this.botMessageQueue.set(chatKey, []);
-        }
-        
-        const queue = this.botMessageQueue.get(chatKey);
-        
-        return new Promise((resolve, reject) => {
-            queue.push({ messageFunc, resolve, reject });
-            this.processMessageQueue(chatKey);
-        });
-    }
-    
-    // Procesar cola de mensajes
-    async processMessageQueue(chatKey) {
-        const queue = this.botMessageQueue.get(chatKey);
-        if (!queue || queue.length === 0) return;
-        
-        // Si ya hay un procesamiento en curso, no hacer nada
-        if (queue.processing) return;
-        
-        queue.processing = true;
-        
-        try {
-            while (queue.length > 0) {
-                const { messageFunc, resolve, reject } = queue.shift();
-                
-                try {
-                    // Pequeña espera para evitar rate limiting
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                    const result = await messageFunc();
-                    resolve(result);
-                } catch (error) {
-                    reject(error);
-                }
-            }
-        } finally {
-            queue.processing = false;
-        }
+        log(`📤 Mensaje del bot registrado`, 'cyan');
     }
     
     // Limpiar datos antiguos
@@ -272,9 +190,7 @@ class AntiSpamSystem {
             activeUsers: this.userMessages.size,
             usersInCooldown: this.userCooldowns.size,
             processedMessages: this.processedMessages.size,
-            botConsecutiveMessages: this.botConsecutiveMessages.length,
-            emergencyBypasses: this.emergencyBypass.size,
-            messageQueues: this.botMessageQueue.size
+            botConsecutiveMessages: this.botConsecutiveMessages.length
         };
     }
 }
@@ -415,39 +331,15 @@ function createBotProxy(originalBot) {
     sendMethods.forEach(method => {
         if (typeof originalBot[method] === 'function') {
             botProxy[method] = async (...args) => {
-                // Extraer chatId del primer argumento para la mayoría de métodos
-                let chatId = null;
-                if (args[0] && (typeof args[0] === 'string' || typeof args[0] === 'number')) {
-                    chatId = args[0];
-                } else if (args[0] && args[0].chat_id) {
-                    chatId = args[0].chat_id;
-                }
-                
                 // Verificar si el bot debe esperar
-                if (antiSpam.shouldBotWait(method, chatId)) {
-                    // En lugar de rechazar inmediatamente, usar el sistema de cola
-                    log(`⏳ Enviando a cola por anti-spam: ${method}`, 'yellow');
-                    
-                    return antiSpam.queueBotMessage(chatId || 'global', async () => {
-                        // Verificar nuevamente antes de enviar
-                        if (antiSpam.shouldBotWait(method, chatId)) {
-                            // Si aún está bloqueado, activar bypass de emergencia
-                            if (chatId) {
-                                antiSpam.activateEmergencyBypass(chatId, 2000);
-                            }
-                        }
-                        
-                        // Registrar que el bot va a enviar un mensaje
-                        antiSpam.recordBotMessage(method);
-                        
-                        // Ejecutar el método original
-                        return await originalBot[method].apply(originalBot, args);
-                    });
+                if (antiSpam.shouldBotWait()) {
+                    log(`🚫 Envío bloqueado por sistema anti-spam: ${method}`, 'yellow');
+                    return Promise.reject(new Error('Bot en cooldown - mensaje bloqueado por anti-spam'));
                 }
                 
                 try {
                     // Registrar que el bot va a enviar un mensaje
-                    antiSpam.recordBotMessage(method);
+                    antiSpam.recordBotMessage();
                     
                     // Ejecutar el método original
                     const result = await originalBot[method].apply(originalBot, args);
@@ -510,9 +402,7 @@ function setupMessageHandler(bot) {
    • Usuarios activos: ${stats.activeUsers}
    • Usuarios en cooldown: ${stats.usersInCooldown}
    • Mensajes procesados: ${stats.processedMessages}
-   • Mensajes consecutivos del bot: ${stats.botConsecutiveMessages}
-   • Bypasses de emergencia: ${stats.emergencyBypasses}
-   • Colas de mensajes: ${stats.messageQueues}${colors.reset}`);
+   • Mensajes consecutivos del bot: ${stats.botConsecutiveMessages}${colors.reset}`);
         }
     });
 
