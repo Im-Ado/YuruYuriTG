@@ -1,6 +1,5 @@
 const yts = require("yt-search");
 const { ytv } = require("@soymaycol/maytube");
-const fetch = require("node-fetch");
 
 const LIMIT_MB = 100;
 
