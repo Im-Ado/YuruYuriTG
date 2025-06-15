@@ -49,7 +49,7 @@ module.exports = (bot) => {
       await bot.sendVideo(chatId, api.url, {
         filename: `${video.title.replace(/[^\w\s]/gi, "")}.mp4`,
         caption: `🎬 *${api.title || video.title}*`,
-        parse_mode: "Markdown"
+        parse_mode: "HTML"
       });
 
     } catch (err) {
