@@ -1,17 +1,16 @@
+const yts = require("yt-search");
+const { yta } = require("@soymaycol/maytube");
+
 module.exports = (bot) => {
   bot.onText(/^\/playaudio (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const text = match[1];
 
     if (!text) return bot.sendMessage(chatId, "🎵 Ingresa un nombre o URL de YouTube.");
-    
+
     bot.sendMessage(chatId, "🔍 Buscando en YouTube...");
 
     try {
-      // Importaciones dinámicas para evitar error de módulos ES
-      const { default: yts } = await import("yt-search");
-      const { yta } = await import("@soymaycol/maytube");
-
       const res = await yts(text);
       const video = res?.all?.[0];
 
