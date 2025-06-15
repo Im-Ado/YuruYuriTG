@@ -1,13 +1,12 @@
-module.exports = (bot) => { bot.onText(/^/evento (.+)$/i, async (msg, match) => { if (msg.chat.type !== 'channel') return; const texto = match[1];
+module.exports = (bot) => {
+  bot.onText(/^\/evento(?:\s+(.+))?$/, async (msg, match) => {
+    if (msg.chat.type !== 'channel') return;
 
-const eventoMsg = `🎊 *¡Evento Especial!*
+    const contenido = match[1];
+    if (!contenido) return;
 
-🗓️ Detalles: ${texto} 📢 ¡No faltes, te esperamos! ❤️`;
-
-try {
-  await bot.sendMessage(msg.chat.id, eventoMsg, { parse_mode: 'Markdown' });
-} catch (e) {
-  console.error('[Error Evento]', e);
-}
-
-}); };
+    bot.sendMessage(msg.chat.id, `🎉 *¡Nuevo Evento en el Canal!* 🎉\n\n${contenido}`, {
+      parse_mode: 'Markdown'
+    });
+  });
+};
