@@ -17,7 +17,7 @@ module.exports = (bot) => {
     try {
       const fileId =
         reply.document?.file_id ||
-        reply.photo?.at(-1)?.file_id ||
+        (Array.isArray(reply.photo) ? reply.photo[reply.photo.length - 1].file_id : null) ||
         reply.video?.file_id;
 
       if (!fileId) {
@@ -26,9 +26,9 @@ module.exports = (bot) => {
         });
       }
 
-      const fileUrl = await bot.getFileLink(fileId); // ✅ Ya es string
+      const fileUrl = await bot.getFileLink(fileId); // ← Esto es un string URL directo
       const res = await fetch(fileUrl);
-      const buffer = Buffer.from(await res.arrayBuffer()); // ⚠️ Usa arrayBuffer en lugar de .buffer()
+      const buffer = Buffer.from(await res.arrayBuffer()); // ← Usa arrayBuffer
 
       const type = await fileType.fileTypeFromBuffer(buffer);
       if (!type) throw new Error("❌ No se pudo detectar el tipo del archivo.");
@@ -49,7 +49,7 @@ module.exports = (bot) => {
 
     } catch (e) {
       console.error('[CatBox Error]', e);
-      bot.sendMessage(chatId, `❌ Error al subir a CatBox. ¿Me das otra oportunidad? (⁠｡⁠•́⁠︿⁠•̀⁠｡⁠)`, {
+      bot.sendMessage(chatId, `❌ Error al subir a CatBox (⁠｡⁠•́⁠︿⁠•̀⁠｡⁠)`, {
         reply_to_message_id: msg.message_id
       });
     }
