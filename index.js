@@ -46,7 +46,7 @@ class AntiSpamSystem {
     constructor() {
         // Configuración del sistema anti-spam
         this.config = {
-            maxMessagesPerUser: 5,          // Máximo 5 mensajes por usuario
+            maxMessagesPerUser: 3,          // Máximo 5 mensajes por usuario
             timeWindow: 15000,              // En ventana de 15 segundos
             globalCooldown: 1000,           // 1 segundo entre respuestas del bot
             userCooldown: 8000,             // 8 segundos de cooldown por usuario tras spam
