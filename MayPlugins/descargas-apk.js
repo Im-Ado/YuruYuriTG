@@ -1,67 +1,59 @@
-import { search, download } from 'aptoide-scraper';
-import fetch from "node-fetch";
-import { fileTypeFromBuffer } from "file-type";
-import { FormData, Blob } from "formdata-node";
-import crypto from "crypto";
+const { search, download } = require("aptoide-scraper");
 
-const limitMB = 50;
-
-export default async function(bot) {
-  bot.onText(/^\/(apk|modapk|aptoide) (.+)/, async (msg, match) => {
+module.exports = (bot) => {
+  bot.onText(/^\/(apk|modapk|aptoide)(?: (.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     const text = match[2];
 
+    if (!text) {
+      return bot.sendMessage(chatId, "📲 Por favor, ingresa el nombre de la APK que deseas descargar.");
+    }
+
+    bot.sendMessage(chatId, "⏳ Buscando la aplicación, espera un momento...");
+
     try {
-      await bot.sendMessage(chatId, "🔍 Buscando en Aptoide...");
       const searchA = await search(text);
+      if (!searchA || searchA.length === 0) {
+        return bot.sendMessage(chatId, "❌ No se encontraron resultados para tu búsqueda.");
+      }
+
       const data = await download(searchA[0].id);
 
-      let caption = `*乂  APTOIDE - DESCARGAS* 乂\n\n`;
-      caption += `☁️ *Nombre* : ${data.name}\n`;
-      caption += `🔖 *Package* : ${data.package}\n`;
-      caption += `🚩 *Actualizado:* ${data.lastup}\n`;
-      caption += `⚖ *Tamaño:* ${data.size}`;
+      if (!data?.dllink) {
+        return bot.sendMessage(chatId, "❌ No se pudo obtener el enlace de descarga.");
+      }
 
-      await bot.sendPhoto(chatId, data.icon, { caption });
+      const caption = `*🎮 Aptoide Downloader*\n\n` +
+        `📱 *Nombre:* ${data.name}\n` +
+        `📦 *Package:* ${data.package}\n` +
+        `🕓 *Actualizado:* ${data.lastup}\n` +
+        `📦 *Peso:* ${data.size}`;
 
-      // Convertimos tamaño a MB
-      const sizeMB = parseFloat(data.size.replace(" MB", "").replace(",", "."));
-      if (data.size.includes('GB') || sizeMB > limitMB) {
-        const buffer = await fetch(data.dllink).then(res => res.arrayBuffer());
-        const link = await subirACatbox(Buffer.from(buffer));
+      if (data.icon) {
+        await bot.sendPhoto(chatId, data.icon, {
+          caption,
+          parse_mode: "HTML"
+        });
+      } else {
+        await bot.sendMessage(chatId, caption, { parse_mode: "HTML" });
+      }
 
-        return bot.sendMessage(chatId, `📦 El archivo era muy pesado para Telegram, así que lo subí a CatBox:\n\n🔗 ${link}`);
+      const peso = parseFloat(data.size.replace(' MB', '').replace('GB', '')) || 0;
+      const isHeavy = data.size.includes("GB") || peso > 999;
+
+      if (isHeavy) {
+        return bot.sendMessage(chatId, "⚠️ El archivo es demasiado pesado para enviarlo por aquí.");
       }
 
       await bot.sendDocument(chatId, data.dllink, {
-        caption: `📦 *${data.name}.apk*`,
         filename: `${data.name}.apk`,
+        caption: "✅ ¡Aquí tienes tu APK!",
+        contentType: "application/vnd.android.package-archive"
       });
 
-    } catch (e) {
-      console.error("❌ Error:", e);
-      bot.sendMessage(chatId, `❌ Ocurrió un error al buscar o enviar la APK.\n${e.message || e}`);
+    } catch (err) {
+      console.error("Error descargando APK:", err);
+      bot.sendMessage(chatId, `❌ Hubo un error:\n\n${err.message}`);
     }
   });
-}
-
-// Función para subir a CatBox
-async function subirACatbox(content) {
-  const { ext, mime } = (await fileTypeFromBuffer(content)) || {};
-  const blob = new Blob([content.toArrayBuffer()], { type: mime });
-  const form = new FormData();
-  const name = crypto.randomBytes(5).toString("hex");
-
-  form.append("reqtype", "fileupload");
-  form.append("fileToUpload", blob, name + "." + ext);
-
-  const res = await fetch("https://catbox.moe/user/api.php", {
-    method: "POST",
-    body: form,
-    headers: {
-      "User-Agent": "Mozilla/5.0 (MaycolBot)",
-    },
-  });
-
-  return await res.text();
-}
+};
