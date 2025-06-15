@@ -41,7 +41,10 @@ module.exports = (bot) => {
 
 // 🧠 Función para subir a CatBox
 async function catbox(content) {
-  const { ext, mime } = (await fileTypeFromBuffer(content)) || { ext: 'bin', mime: 'application/octet-stream' };
+  const type = await fileTypeFromBuffer(content);
+if (!type) throw new Error("❌ No se pudo detectar el tipo del archivo");
+
+  const { ext, mime } = type;
   const blob = new Blob([content], { type: mime });
   const formData = new FormData();
   const randomBytes = crypto.randomBytes(5).toString("hex");
