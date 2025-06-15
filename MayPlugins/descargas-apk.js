@@ -1,5 +1,5 @@
 const { search, download } = require('aptoide-scraper');
-const fetch = require("node-fetch");
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const crypto = require("crypto");
 const { FormData, Blob } = require("formdata-node");
 const { fileTypeFromBuffer } = require("file-type");
