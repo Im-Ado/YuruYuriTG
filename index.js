@@ -36,251 +36,9 @@ ${colors.cyan}
 ${colors.yellow}        ╔══════════════════════════════════════╗
 ${colors.yellow}        ║     🤖 MaycolAIUltraMD Bot 🤖        ║
 ${colors.yellow}        ║        Created by SoyMaycol         ║
-${colors.yellow}        ║       🛡️ ANTI-SPAM ACTIVADO 🛡️       ║
 ${colors.yellow}        ╚══════════════════════════════════════╝
 ${colors.reset}
 `;
-
-// Sistema Anti-Spam Global
-class AntiSpamSystem {
-    constructor() {
-        // Configuración del sistema anti-spam
-        this.config = {
-            maxMessagesPerUser: 5,          // Máximo 5 mensajes por usuario
-            timeWindow: 15000,              // En ventana de 15 segundos
-            globalCooldown: 1000,           // 1 segundo entre respuestas del bot
-            userCooldown: 8000,             // 8 segundos de cooldown por usuario tras spam
-            maxConsecutiveMessages: 4,       // Máximo 4 mensajes consecutivos del bot
-            consecutiveTimeWindow: 5000,     // Ventana de 5 segundos para mensajes consecutivos
-            emergencyBypass: 3000,          // Tiempo para bypass de emergencia
-            priorityMethods: [              // Métodos que tienen prioridad
-                'answerCallbackQuery',
-                'editMessageText',
-                'editMessageCaption'
-            ]
-        };
-        
-        // Tracking de usuarios
-        this.userMessages = new Map();      // userId -> [{timestamp, messageId}, ...]
-        this.userCooldowns = new Map();     // userId -> timestamp
-        this.lastBotMessage = 0;            // Timestamp del último mensaje del bot
-        this.botConsecutiveMessages = [];   // Array de timestamps de mensajes consecutivos del bot
-        this.processedMessages = new Set(); // Set de messageIds ya procesados
-        this.emergencyBypass = new Map();   // chatId -> timestamp para bypass de emergencia
-        this.botMessageQueue = new Map();   // chatId -> Array de mensajes en cola
-        
-        // Limpiar datos antiguos cada 30 segundos
-        setInterval(() => this.cleanup(), 30000);
-        
-        log('🛡️ Sistema Anti-Spam inicializado (Versión Mejorada)', 'green');
-    }
-    
-    // Verificar si un usuario está en spam
-    isUserSpamming(userId, messageId) {
-        const now = Date.now();
-        const userKey = userId.toString();
-        
-        // Verificar si el mensaje ya fue procesado
-        if (this.processedMessages.has(messageId)) {
-            log(`⚠️ Mensaje duplicado detectado: ${messageId}`, 'yellow');
-            return true;
-        }
-        
-        // Verificar cooldown del usuario
-        if (this.userCooldowns.has(userKey)) {
-            const cooldownEnd = this.userCooldowns.get(userKey);
-            if (now < cooldownEnd) {
-                const remaining = Math.ceil((cooldownEnd - now) / 1000);
-                log(`🚫 Usuario ${userId} en cooldown (${remaining}s restantes)`, 'yellow');
-                return true;
-            } else {
-                this.userCooldowns.delete(userKey);
-            }
-        }
-        
-        // Obtener mensajes del usuario en la ventana de tiempo
-        if (!this.userMessages.has(userKey)) {
-            this.userMessages.set(userKey, []);
-        }
-        
-        const userMsgs = this.userMessages.get(userKey);
-        const windowStart = now - this.config.timeWindow;
-        
-        // Filtrar mensajes dentro de la ventana de tiempo
-        const recentMessages = userMsgs.filter(msg => msg.timestamp > windowStart);
-        
-        // Verificar si excede el límite
-        if (recentMessages.length >= this.config.maxMessagesPerUser) {
-            log(`🚨 SPAM detectado: Usuario ${userId} (${recentMessages.length} mensajes en ${this.config.timeWindow/1000}s)`, 'red');
-            
-            // Aplicar cooldown
-            this.userCooldowns.set(userKey, now + this.config.userCooldown);
-            return true;
-        }
-        
-        // Agregar mensaje actual al tracking
-        recentMessages.push({ timestamp: now, messageId });
-        this.userMessages.set(userKey, recentMessages);
-        
-        // Marcar mensaje como procesado
-        this.processedMessages.add(messageId);
-        
-        return false;
-    }
-    
-    // Verificar si el bot debe esperar antes de responder
-    shouldBotWait(method = '', chatId = null) {
-        const now = Date.now();
-        
-        // Métodos prioritarios pueden saltarse algunas restricciones
-        const isPriorityMethod = this.config.priorityMethods.includes(method);
-        
-        // Verificar bypass de emergencia para el chat
-        if (chatId && this.emergencyBypass.has(chatId)) {
-            const bypassEnd = this.emergencyBypass.get(chatId);
-            if (now < bypassEnd) {
-                log(`🚀 Bypass de emergencia activo para chat ${chatId}`, 'cyan');
-                return false;
-            } else {
-                this.emergencyBypass.delete(chatId);
-            }
-        }
-        
-        // Los métodos prioritarios tienen cooldown reducido
-        const cooldownTime = isPriorityMethod ? this.config.globalCooldown / 2 : this.config.globalCooldown;
-        
-        // Verificar cooldown global
-        if (now - this.lastBotMessage < cooldownTime) {
-            const remaining = Math.ceil((cooldownTime - (now - this.lastBotMessage)) / 1000);
-            if (!isPriorityMethod) {
-                log(`⏳ Bot en cooldown global (${remaining}s) - Método: ${method}`, 'yellow');
-                return true;
-            }
-        }
-        
-        // Verificar mensajes consecutivos del bot (más flexible para métodos prioritarios)
-        const windowStart = now - this.config.consecutiveTimeWindow;
-        this.botConsecutiveMessages = this.botConsecutiveMessages.filter(ts => ts > windowStart);
-        
-        const maxConsecutive = isPriorityMethod ? this.config.maxConsecutiveMessages * 2 : this.config.maxConsecutiveMessages;
-        
-        if (this.botConsecutiveMessages.length >= maxConsecutive) {
-            log(`🚫 Bot ha enviado demasiados mensajes consecutivos (${this.botConsecutiveMessages.length}/${maxConsecutive})`, 'yellow');
-            return true;
-        }
-        
-        return false;
-    }
-    
-    // Activar bypass de emergencia para un chat específico
-    activateEmergencyBypass(chatId, duration = null) {
-        const bypassDuration = duration || this.config.emergencyBypass;
-        const now = Date.now();
-        this.emergencyBypass.set(chatId, now + bypassDuration);
-        log(`🚨 Bypass de emergencia activado para chat ${chatId} por ${bypassDuration/1000}s`, 'green');
-    }
-    
-    // Registrar que el bot envió un mensaje
-    recordBotMessage(method = '') {
-        const now = Date.now();
-        this.lastBotMessage = now;
-        this.botConsecutiveMessages.push(now);
-        log(`📤 Mensaje del bot registrado: ${method}`, 'cyan');
-    }
-    
-    // Crear cola de mensajes para evitar bloqueos
-    async queueBotMessage(chatId, messageFunc) {
-        const chatKey = chatId.toString();
-        
-        if (!this.botMessageQueue.has(chatKey)) {
-            this.botMessageQueue.set(chatKey, []);
-        }
-        
-        const queue = this.botMessageQueue.get(chatKey);
-        
-        return new Promise((resolve, reject) => {
-            queue.push({ messageFunc, resolve, reject });
-            this.processMessageQueue(chatKey);
-        });
-    }
-    
-    // Procesar cola de mensajes
-    async processMessageQueue(chatKey) {
-        const queue = this.botMessageQueue.get(chatKey);
-        if (!queue || queue.length === 0) return;
-        
-        // Si ya hay un procesamiento en curso, no hacer nada
-        if (queue.processing) return;
-        
-        queue.processing = true;
-        
-        try {
-            while (queue.length > 0) {
-                const { messageFunc, resolve, reject } = queue.shift();
-                
-                try {
-                    // Pequeña espera para evitar rate limiting
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                    const result = await messageFunc();
-                    resolve(result);
-                } catch (error) {
-                    reject(error);
-                }
-            }
-        } finally {
-            queue.processing = false;
-        }
-    }
-    
-    // Limpiar datos antiguos
-    cleanup() {
-        const now = Date.now();
-        const oldThreshold = now - (this.config.timeWindow * 2);
-        
-        // Limpiar mensajes de usuarios antiguos
-        for (const [userId, messages] of this.userMessages.entries()) {
-            const filteredMessages = messages.filter(msg => msg.timestamp > oldThreshold);
-            if (filteredMessages.length === 0) {
-                this.userMessages.delete(userId);
-            } else {
-                this.userMessages.set(userId, filteredMessages);
-            }
-        }
-        
-        // Limpiar cooldowns expirados
-        for (const [userId, cooldownEnd] of this.userCooldowns.entries()) {
-            if (now > cooldownEnd) {
-                this.userCooldowns.delete(userId);
-            }
-        }
-        
-        // Limpiar mensajes procesados antiguos (mantener solo los últimos 1000)
-        if (this.processedMessages.size > 1000) {
-            const processed = Array.from(this.processedMessages);
-            this.processedMessages.clear();
-            // Mantener solo los más recientes
-            processed.slice(-500).forEach(id => this.processedMessages.add(id));
-        }
-        
-        log(`🧹 Limpieza del sistema anti-spam completada`, 'dim');
-    }
-    
-    // Obtener estadísticas del sistema
-    getStats() {
-        return {
-            activeUsers: this.userMessages.size,
-            usersInCooldown: this.userCooldowns.size,
-            processedMessages: this.processedMessages.size,
-            botConsecutiveMessages: this.botConsecutiveMessages.length,
-            emergencyBypasses: this.emergencyBypass.size,
-            messageQueues: this.botMessageQueue.size
-        };
-    }
-}
-
-// Crear instancia global del sistema anti-spam
-const antiSpam = new AntiSpamSystem();
 
 // Función para mostrar mensajes con colores
 function log(message, color = 'white') {
@@ -354,7 +112,7 @@ function validateToken(token) {
     return token && token.includes(':') && token.length > 20;
 }
 
-// Función para cargar plugins con protección anti-spam
+// Función para cargar plugins
 function loadPlugins(bot) {
     let pluginCount = 0;
     
@@ -370,15 +128,14 @@ function loadPlugins(bot) {
         if (file.endsWith('.js')) {
             try {
                 const pluginPath = path.join(pluginsPath, file);
+                // Limpiar caché del require para recargas
                 delete require.cache[require.resolve(pluginPath)];
                 const handler = require(pluginPath);
                 
                 if (typeof handler === 'function') {
-                    // Envolver el plugin con protección anti-spam
-                    const wrappedHandler = createAntiSpamWrapper(handler);
-                    wrappedHandler(bot);
+                    handler(bot);
                     pluginCount++;
-                    log(`Plugin cargado con protección anti-spam: ${file}`, 'green');
+                    log(`Plugin cargado: ${file}`, 'green');
                 } else {
                     log(`Plugin inválido: ${file}`, 'yellow');
                 }
@@ -391,88 +148,7 @@ function loadPlugins(bot) {
     return pluginCount;
 }
 
-// Wrapper para proteger plugins del spam
-function createAntiSpamWrapper(originalHandler) {
-    return (bot) => {
-        // Crear un bot proxy que intercepta todos los métodos de envío
-        const botProxy = createBotProxy(bot);
-        
-        // Ejecutar el handler original con el bot protegido
-        originalHandler(botProxy);
-    };
-}
-
-// Crear proxy del bot para interceptar envíos de mensajes
-function createBotProxy(originalBot) {
-    const sendMethods = [
-        'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 
-        'sendVoice', 'sendLocation', 'sendSticker', 'sendAnimation',
-        'editMessageText', 'editMessageCaption', 'answerCallbackQuery'
-    ];
-    
-    const botProxy = Object.create(originalBot);
-    
-    sendMethods.forEach(method => {
-        if (typeof originalBot[method] === 'function') {
-            botProxy[method] = async (...args) => {
-                // Extraer chatId del primer argumento para la mayoría de métodos
-                let chatId = null;
-                if (args[0] && (typeof args[0] === 'string' || typeof args[0] === 'number')) {
-                    chatId = args[0];
-                } else if (args[0] && args[0].chat_id) {
-                    chatId = args[0].chat_id;
-                }
-                
-                // Verificar si el bot debe esperar
-                if (antiSpam.shouldBotWait(method, chatId)) {
-                    // En lugar de rechazar inmediatamente, usar el sistema de cola
-                    log(`⏳ Enviando a cola por anti-spam: ${method}`, 'yellow');
-                    
-                    return antiSpam.queueBotMessage(chatId || 'global', async () => {
-                        // Verificar nuevamente antes de enviar
-                        if (antiSpam.shouldBotWait(method, chatId)) {
-                            // Si aún está bloqueado, activar bypass de emergencia
-                            if (chatId) {
-                                antiSpam.activateEmergencyBypass(chatId, 2000);
-                            }
-                        }
-                        
-                        // Registrar que el bot va a enviar un mensaje
-                        antiSpam.recordBotMessage(method);
-                        
-                        // Ejecutar el método original
-                        return await originalBot[method].apply(originalBot, args);
-                    });
-                }
-                
-                try {
-                    // Registrar que el bot va a enviar un mensaje
-                    antiSpam.recordBotMessage(method);
-                    
-                    // Ejecutar el método original
-                    const result = await originalBot[method].apply(originalBot, args);
-                    
-                    log(`✅ Mensaje enviado: ${method}`, 'green');
-                    return result;
-                } catch (error) {
-                    log(`❌ Error enviando mensaje: ${error.message}`, 'red');
-                    throw error;
-                }
-            };
-        }
-    });
-    
-    // Copiar todas las demás propiedades y métodos
-    Object.keys(originalBot).forEach(key => {
-        if (!(key in botProxy)) {
-            botProxy[key] = originalBot[key];
-        }
-    });
-    
-    return botProxy;
-}
-
-// Función para manejar mensajes del bot con sistema anti-spam
+// Función para manejar mensajes del bot
 function setupMessageHandler(bot) {
     bot.on('message', (msg) => {
         const chatId = msg.chat.id;
@@ -481,13 +157,6 @@ function setupMessageHandler(bot) {
         const messageText = msg.text || '[Archivo/Media]';
         const chatType = msg.chat.type;
         const chatTitle = msg.chat.title || 'Chat Privado';
-        const messageId = msg.message_id;
-
-        // Aplicar sistema anti-spam
-        if (antiSpam.isUserSpamming(userId, messageId)) {
-            log(`🚫 Mensaje bloqueado por spam - Usuario: ${userName}`, 'red');
-            return; // No procesar el mensaje
-        }
 
         // Log del mensaje recibido
         console.log(`${colors.magenta}
@@ -499,21 +168,7 @@ function setupMessageHandler(bot) {
 │ 💬 Chat: ${chatTitle.padEnd(46)} │
 │ 📝 Tipo: ${chatType.padEnd(46)} │
 │ 🔤 Mensaje: ${messageText.slice(0, 40).padEnd(40)} │
-│ 🆔 Msg ID: ${messageId.toString().padEnd(42)} │
 └${'─'.repeat(60)}┘${colors.reset}`);
-
-        // Mostrar estadísticas del anti-spam cada 50 mensajes
-        const stats = antiSpam.getStats();
-        if (stats.processedMessages % 50 === 0) {
-            console.log(`${colors.cyan}
-📊 ESTADÍSTICAS ANTI-SPAM:
-   • Usuarios activos: ${stats.activeUsers}
-   • Usuarios en cooldown: ${stats.usersInCooldown}
-   • Mensajes procesados: ${stats.processedMessages}
-   • Mensajes consecutivos del bot: ${stats.botConsecutiveMessages}
-   • Bypasses de emergencia: ${stats.emergencyBypasses}
-   • Colas de mensajes: ${stats.messageQueues}${colors.reset}`);
-        }
     });
 
     bot.on('polling_error', (error) => {
@@ -539,6 +194,7 @@ async function startBot() {
         log('Token encontrado en configuración', 'green');
         token = config.token;
         
+        // Mostrar última conexión
         const lastConnection = new Date(config.lastConnection).toLocaleString();
         log(`Última conexión: ${lastConnection}`, 'cyan');
     } else {
@@ -558,7 +214,7 @@ async function startBot() {
     try {
         const bot = new TelegramBot(token, { 
             polling: {
-                interval: 500,  // Incrementamos intervalo para evitar spam
+                interval: 300,
                 autoStart: true,
                 params: {
                     timeout: 10
@@ -566,7 +222,7 @@ async function startBot() {
             }
         });
 
-        // Configurar manejadores de mensajes con anti-spam
+        // Configurar manejadores de mensajes
         setupMessageHandler(bot);
 
         // Verificar conexión
@@ -582,20 +238,19 @@ async function startBot() {
 ║  👤 Usuario: @${botInfo.username.padEnd(35)} ║
 ║  🆔 ID: ${botInfo.id.toString().padEnd(41)} ║
 ║  📅 Iniciado: ${new Date().toLocaleString().padEnd(33)} ║
-║  🛡️ Anti-Spam: ACTIVADO                               ║
 ╚════════════════════════════════════════════════════════╝${colors.reset}`);
 
-        // Cargar plugins con protección anti-spam
-        log('🔌 Cargando plugins con protección anti-spam...', 'cyan');
+        // Cargar plugins
+        log('🔌 Cargando plugins...', 'cyan');
         const pluginCount = loadPlugins(bot);
         
         if (pluginCount > 0) {
-            log(`✅ ${pluginCount} plugins cargados con protección anti-spam`, 'green');
+            log(`✅ ${pluginCount} plugins cargados exitosamente`, 'green');
         } else {
             log('⚠️ No se encontraron plugins', 'yellow');
         }
 
-        showBotStatus('🚀 Bot funcionando con anti-spam activo', 'green');
+        showBotStatus('🚀 Bot funcionando correctamente', 'green');
         
         log('Bot iniciado correctamente. Presiona Ctrl+C para detener.', 'bright');
 
