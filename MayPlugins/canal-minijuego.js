@@ -1,11 +1,7 @@
 module.exports = (bot) => {
-  bot.onText(/^\/minijuego$/, async (msg) => {
-    if (msg.chat.type !== 'channel') {
-      return bot.sendMessage(msg.chat.id, '❌ Este comando solo se puede usar en *canales*. Anda a tu canal favorito para jugar con todos (⁠｡⁠•̀⁠ᴗ⁠-⁠)⁠✧', {
-        reply_to_message_id: msg.message_id,
-        parse_mode: 'Markdown'
-      });
-    }
+  bot.onText(/^\/minijuego\s+(@\S+)/, async (msg, match) => {
+    const canal = match[1]; // @Canal
+    const chatId = msg.chat.id;
 
     // 🎮 Lista de minijuegos
     const juegos = [
@@ -31,7 +27,6 @@ module.exports = (bot) => {
       }
     ];
 
-    // 🌀 Elegimos uno al azar
     const randomGame = juegos[Math.floor(Math.random() * juegos.length)];
 
     const texto = `
@@ -47,9 +42,20 @@ module.exports = (bot) => {
 #juegos #diversión #canal #MaycolBot
 `.trim();
 
-    // 💬 Lo mandamos decorado
-    await bot.sendMessage(msg.chat.id, texto, {
-      parse_mode: 'Markdown'
-    });
+    try {
+      const canalInfo = await bot.getChat(canal);
+      await bot.sendMessage(canalInfo.id, texto, {
+        parse_mode: 'Markdown'
+      });
+
+      // 🎉 Confirmación opcional
+      if (chatId !== canalInfo.id) {
+        bot.sendMessage(chatId, `✅ El minijuego fue enviado al canal ${canal} (⁠◍⁠•⁠ᴗ⁠•⁠◍⁠)⁠❤`);
+      }
+
+    } catch (error) {
+      console.error(error);
+      bot.sendMessage(chatId, `❌ No pude enviar el minijuego a ${canal}.\n¿Tengo permisos suficientes? (⁠｡⁠•́︿•̀｡⁠)`);
+    }
   });
 };
