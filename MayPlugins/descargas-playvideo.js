@@ -1,7 +1,30 @@
 const yts = require("yt-search");
 const { ytv } = require("@soymaycol/maytube");
+const fs = require("fs");
+const path = require("path");
+const https = require("https");
 
 const LIMIT_MB = 100;
+
+// Función para descargar un archivo desde una URL a una ruta local
+const downloadToFile = (url, dest) =>
+  new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(dest);
+    https.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode}`));
+        return;
+      }
+
+      response.pipe(file);
+      file.on("finish", () => {
+        file.close(() => resolve(dest));
+      });
+    }).on("error", (err) => {
+      fs.unlink(dest, () => {});
+      reject(err);
+    });
+  });
 
 module.exports = (bot) => {
   bot.onText(/^\/playvideo (.+)/, async (msg, match) => {
@@ -26,74 +49,58 @@ module.exports = (bot) => {
         await bot.sendMessage(chatId, info, { parse_mode: "Markdown" });
       }
 
-      // Obtener información del video
       const api = await ytv(video.url);
       if (!api?.url) throw new Error("No se pudo obtener el video.");
 
-      console.log("URL del video:", api.url); // Para debugging
+      console.log("URL del video:", api.url);
 
-      // Validar que la URL sea accesible
+      // Verificar tamaño del archivo
       let sizemb = 0;
-      let isValidUrl = false;
-
       try {
-        const res = await fetch(api.url, {
+        const headRes = await fetch(api.url, {
           method: "HEAD",
-          timeout: 10000,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
+          headers: { "User-Agent": "Mozilla/5.0" }
         });
 
-        if (res.ok) {
-          isValidUrl = true;
-          const length = res.headers.get("content-length");
+        if (headRes.ok) {
+          const length = headRes.headers.get("content-length");
           sizemb = length ? parseInt(length) / (1024 * 1024) : 0;
         }
       } catch (e) {
-        console.log("Error al verificar URL:", e.message);
-        isValidUrl = false;
-      }
-
-      if (!isValidUrl) {
-        return bot.sendMessage(chatId, "❌ La URL del video no es válida o no está disponible. Intenta con otro video.");
+        console.log("Advertencia: no se pudo obtener tamaño del archivo:", e.message);
       }
 
       if (sizemb > LIMIT_MB && sizemb > 0) {
         return bot.sendMessage(chatId, `🚫 El archivo pesa ${sizemb.toFixed(2)} MB. Límite: ${LIMIT_MB} MB. Usa otro video 🎬`);
       }
 
-      // Sanitizar el nombre del archivo (aunque no se usará directamente)
-      const cleanTitle = video.title.replace(/[^\w\s\-_.]/gi, "").replace(/\s+/g, "_").substring(0, 40);
+      // Sanitizar el nombre del archivo
+      const cleanTitle = video.title.replace(/[^\w\s\-_.]/gi, "").substring(0, 50);
+      const filePath = path.join(__dirname, `${cleanTitle}.mp4`);
 
-      // Intentar enviar el video desde la URL
       try {
-        await bot.sendVideo(chatId, api.url, {
-          caption: `🎬 ${api.title || video.title}`,
+        await bot.sendMessage(chatId, "⬇️ Descargando video localmente...");
+        await downloadToFile(api.url, filePath);
+
+        await bot.sendVideo(chatId, fs.createReadStream(filePath), {
+          caption: `🎬 <b>${api.title || video.title}</b>`,
+          parse_mode: "HTML",
           supports_streaming: true
         });
+
+        fs.unlink(filePath, () => {}); // Borrar el archivo temporal
       } catch (videoError) {
         console.error("Error enviando video:", videoError);
 
-        // Alternativa: enviar como documento
-        try {
-          await bot.sendDocument(chatId, api.url, {
-            caption: `🎬 ${api.title || video.title}\n\n📁 Enviado como archivo debido a restricciones`
-          });
-        } catch (docError) {
-          console.error("Error enviando documento:", docError);
-
-          // Última alternativa: enviar solo el enlace
-          await bot.sendMessage(chatId,
-            `❌ No se pudo enviar el video directamente.\n\n🔗 Enlace del video:\n${api.url}\n\n💡 Puedes descargarlo manualmente desde ese enlace.`
-          );
-        }
+        await bot.sendMessage(chatId,
+          `❌ No se pudo descargar o enviar el video.\n\n🔗 Enlace para descargar manualmente:\n${api.url}`,
+          { parse_mode: "HTML" }
+        );
       }
 
     } catch (err) {
       console.error("Error general:", err);
 
-      // Mensajes de error más específicos
       if (err.message.includes("ETELEGRAM")) {
         bot.sendMessage(chatId, "❌ Error de Telegram: No se pudo procesar el video. El enlace puede estar caducado o no ser compatible.");
       } else if (err.message.includes("timeout")) {
