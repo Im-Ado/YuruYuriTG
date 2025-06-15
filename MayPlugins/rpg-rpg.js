@@ -196,7 +196,6 @@ function getRandomEnemy(playerLevel) {
   const baseEnemy = enemies[Math.floor(Math.random() * enemies.length)];
   
   // Crear copia y ajustar stats según nivel del jugador
-  const enemy = { ...baseEnemy };
   if (playerLevel > enemyLevel) {
     const multiplier = 1 + (playerLevel - enemyLevel) * 0.2;
     enemy.hp = Math.floor(enemy.hp * multiplier);
