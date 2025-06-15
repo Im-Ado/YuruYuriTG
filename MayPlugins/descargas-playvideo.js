@@ -3,13 +3,13 @@ const { ytv } = require("@soymaycol/maytube");
 const fetch = require("node-fetch");
 const crypto = require("crypto");
 const { Blob } = require("formdata-node");
-const { fileTypeFromBuffer } = require("file-type");
 const { FormData } = require("formdata-node");
+const { fileTypeFromBuffer } = require("file-type");
 
 const LIMIT_MB = 100;
 
 module.exports = (bot) => {
-  bot.onText(/^\/playvideo (.+)/, async (msg, match) => {
+  bot.onText(/^\/playvideo(?:\s+)?(.+)?/i, async (msg, match) => {
     const chatId = msg.chat.id;
     const text = match[1];
 
@@ -32,48 +32,47 @@ module.exports = (bot) => {
       }
 
       const api = await ytv(video.url);
-      if (!api?.url) throw new Error("No se pudo obtener el video.");
+      if (!api?.url) throw new Error("No se pudo obtener el video de YouTube.");
 
       // Verificar tamaño
-      let sizeMB = 0;
       let buffer = null;
+      let sizeMB = 0;
 
       try {
         const res = await fetch(api.url);
         buffer = await res.buffer();
         sizeMB = buffer.length / (1024 * 1024);
       } catch (e) {
-        console.log("⚠️ No se pudo calcular el tamaño, se intentará igual.");
+        console.warn("⚠️ No se pudo calcular el tamaño, se intentará enviar igual.");
       }
 
-      // Si pesa demasiado o da error, subir a CatBox
-      if (sizeMB > LIMIT_MB) {
-        const catboxUrl = await subirACatbox(buffer);
-        return bot.sendMessage(chatId, `📦 El video es muy pesado (${sizeMB.toFixed(2)} MB), así que lo subí a CatBox:\n\n🔗 ${catboxUrl}`);
+      if (!buffer || sizeMB > LIMIT_MB) {
+        const url = await subirACatbox(buffer);
+        return bot.sendMessage(chatId, `📦 El video es muy pesado (${sizeMB.toFixed(2)} MB), así que lo subí a CatBox:\n\n🔗 ${url}`);
       }
 
       await bot.sendVideo(chatId, api.url, {
-        caption: `🎬 *${api.title || video.title}*`,
+        caption: `🎬 *${video.title}*`,
         parse_mode: "Markdown",
         filename: `${video.title.replace(/[^\w\s]/gi, "")}.mp4`
       });
 
     } catch (err) {
       console.error("❌ Error general:", err);
-      bot.sendMessage(chatId, `❌ Error al procesar el video:\n${err.message || err}`);
+      bot.sendMessage(chatId, `❌ Ocurrió un error al procesar el video:\n\n${err.message || err}`);
     }
   });
 };
 
-// Función para subir a CatBox
+// 🌐 Subida a CatBox
 async function subirACatbox(content) {
-  const { ext, mime } = (await fileTypeFromBuffer(content)) || {};
+  const { ext = 'mp4', mime = 'video/mp4' } = (await fileTypeFromBuffer(content)) || {};
   const blob = new Blob([content.toArrayBuffer()], { type: mime });
   const formData = new FormData();
   const randomName = crypto.randomBytes(5).toString("hex");
 
   formData.append("reqtype", "fileupload");
-  formData.append("fileToUpload", blob, randomName + "." + ext);
+  formData.append("fileToUpload", blob, `${randomName}.${ext}`);
 
   const res = await fetch("https://catbox.moe/user/api.php", {
     method: "POST",
@@ -83,5 +82,6 @@ async function subirACatbox(content) {
     }
   });
 
-  return await res.text();
+  const url = await res.text();
+  return url;
 }
