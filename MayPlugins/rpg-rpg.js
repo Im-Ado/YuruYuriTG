@@ -4,647 +4,621 @@ const path = require('path');
 // Ruta del archivo de base de datos
 const DB_PATH = path.join(__dirname, '..', 'database.json');
 
-// Clases disponibles
-const CLASSES = {
-  warrior: {
-    name: '⚔️ Guerrero',
-    baseHp: 120,
-    baseAttack: 25,
-    baseDefense: 20,
-    baseMana: 30,
-    skills: ['Golpe Fuerte', 'Defensa Férrea', 'Grito de Guerra']
-  },
-  mage: {
-    name: '🔮 Mago',
-    baseHp: 80,
-    baseAttack: 35,
-    baseDefense: 10,
-    baseMana: 100,
-    skills: ['Bola de Fuego', 'Escudo Mágico', 'Rayo']
-  },
-  archer: {
-    name: '🏹 Arquero',
-    baseHp: 100,
-    baseAttack: 30,
-    baseDefense: 15,
-    baseMana: 50,
-    skills: ['Disparo Certero', 'Lluvia de Flechas', 'Sigilo']
-  },
-  paladin: {
-    name: '✨ Paladín',
-    baseHp: 110,
-    baseAttack: 20,
-    baseDefense: 25,
-    baseMana: 60,
-    skills: ['Curación', 'Luz Divina', 'Protección']
-  }
-};
-
-// Enemigos por nivel
-const ENEMIES = {
-  1: [
-    { name: '🐭 Rata', hp: 20, attack: 8, defense: 2, exp: 10, gold: 5 },
-    { name: '🕷️ Araña', hp: 25, attack: 10, defense: 3, exp: 12, gold: 7 }
-  ],
-  2: [
-    { name: '🐺 Lobo', hp: 40, attack: 15, defense: 5, exp: 20, gold: 12 },
-    { name: '👹 Goblin', hp: 35, attack: 18, defense: 4, exp: 25, gold: 15 }
-  ],
-  3: [
-    { name: '🐻 Oso', hp: 60, attack: 22, defense: 8, exp: 35, gold: 25 },
-    { name: '🧟 Zombie', hp: 50, attack: 20, defense: 6, exp: 30, gold: 20 }
-  ],
-  4: [
-    { name: '🐲 Dragoncillo', hp: 80, attack: 30, defense: 12, exp: 50, gold: 40 },
-    { name: '👤 Asesino', hp: 70, attack: 35, defense: 8, exp: 45, gold: 35 }
-  ],
-  5: [
-    { name: '🐉 Dragón', hp: 120, attack: 45, defense: 20, exp: 100, gold: 80 },
-    { name: '👹 Demonio', hp: 100, attack: 40, defense: 15, exp: 90, gold: 70 }
-  ]
-};
-
-// Items disponibles
-const ITEMS = {
-  weapons: {
-    'espada_madera': { name: '🗡️ Espada de Madera', attack: 5, price: 50 },
-    'espada_hierro': { name: '⚔️ Espada de Hierro', attack: 15, price: 200 },
-    'baston_magico': { name: '🪄 Bastón Mágico', attack: 20, mana: 10, price: 300 },
-    'arco_elfico': { name: '🏹 Arco Élfico', attack: 18, price: 250 },
-    'martillo_sagrado': { name: '🔨 Martillo Sagrado', attack: 25, defense: 5, price: 400 }
-  },
-  armor: {
-    'armadura_cuero': { name: '🛡️ Armadura de Cuero', defense: 8, price: 80 },
-    'armadura_hierro': { name: '🛡️ Armadura de Hierro', defense: 15, price: 300 },
-    'tunica_magica': { name: '👘 Túnica Mágica', defense: 10, mana: 20, price: 250 },
-    'armadura_sagrada': { name: '✨ Armadura Sagrada', defense: 20, hp: 30, price: 500 }
-  },
-  consumables: {
-    'pocion_vida': { name: '❤️ Poción de Vida', heal: 50, price: 30 },
-    'pocion_mana': { name: '💙 Poción de Maná', mana: 30, price: 25 },
-    'elixir_fuerza': { name: '💪 Elixir de Fuerza', attack: 10, duration: 3, price: 100 }
-  }
-};
-
 // Función para cargar la base de datos
 function loadDatabase() {
   try {
-    if (fs.existsSync(DB_PATH)) {
-      const data = fs.readFileSync(DB_PATH, 'utf8');
-      return JSON.parse(data);
+    if (!fs.existsSync(DB_PATH)) {
+      const initialData = { users: {}, guilds: {}, rpg: {} };
+      fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2));
+      return initialData;
     }
+    const data = fs.readFileSync(DB_PATH, 'utf8');
+    const parsed = JSON.parse(data);
+    
+    // Asegurar que existe la sección RPG
+    if (!parsed.rpg) parsed.rpg = {};
+    
+    return parsed;
   } catch (error) {
-    console.error('Error al cargar la base de datos:', error);
+    console.error('Error cargando database:', error);
+    return { users: {}, guilds: {}, rpg: {} };
   }
-  return { rpg: {} };
 }
 
 // Función para guardar la base de datos
-function saveDatabase(db) {
+function saveDatabase(data) {
   try {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+    return true;
   } catch (error) {
-    console.error('Error al guardar la base de datos:', error);
+    console.error('Error guardando database:', error);
+    return false;
   }
 }
 
-// Función para obtener o crear un jugador
-function getPlayer(userId) {
+// Función para obtener o crear perfil de usuario
+function getUserProfile(userId) {
   const db = loadDatabase();
+  
   if (!db.rpg[userId]) {
     db.rpg[userId] = {
-      name: null,
-      class: null,
+      name: 'Aventurero',
       level: 1,
       exp: 0,
-      expToNext: 100,
+      expNext: 100,
       hp: 100,
       maxHp: 100,
-      mana: 50,
-      maxMana: 50,
-      attack: 10,
-      defense: 5,
+      mp: 50,
+      maxMp: 50,
+      attack: 15,
+      defense: 10,
+      speed: 12,
       gold: 100,
       inventory: {
-        weapons: {},
-        armor: {},
-        consumables: { 'pocion_vida': 3 }
+        'Poción de Vida': 3,
+        'Poción de Maná': 2
       },
       equipment: {
-        weapon: null,
-        armor: null,
+        weapon: 'Espada de Madera',
+        armor: 'Ropa Simple',
         accessory: null
       },
-      location: 'town',
-      inBattle: false,
-      battleData: null,
-      questsCompleted: 0,
+      location: 'Ciudad Inicial',
+      lastAdventure: 0,
       achievements: [],
-      lastDaily: null,
       stats: {
-        battlesWon: 0,
-        enemiesKilled: 0,
+        monstersKilled: 0,
+        adventuresCompleted: 0,
         goldEarned: 0,
-        itemsBought: 0
+        timesHealed: 0
       }
     };
+    saveDatabase(db);
   }
+  
   return db.rpg[userId];
 }
 
-// Función para guardar jugador
-function savePlayer(userId, playerData) {
+// Función para actualizar perfil de usuario
+function updateUserProfile(userId, updates) {
   const db = loadDatabase();
-  db.rpg[userId] = playerData;
-  saveDatabase(db);
+  if (db.rpg[userId]) {
+    Object.assign(db.rpg[userId], updates);
+    saveDatabase(db);
+    return true;
+  }
+  return false;
+}
+
+// Sistema de enemigos
+const ENEMIES = {
+  weak: [
+    { name: 'Slime Verde', hp: 30, attack: 8, defense: 2, exp: 15, gold: 10 },
+    { name: 'Goblin', hp: 45, attack: 12, defense: 4, exp: 25, gold: 18 },
+    { name: 'Rata Gigante', hp: 35, attack: 10, defense: 3, exp: 20, gold: 12 }
+  ],
+  normal: [
+    { name: 'Orco Guerrero', hp: 80, attack: 18, defense: 8, exp: 45, gold: 35 },
+    { name: 'Esqueleto Arquero', hp: 65, attack: 22, defense: 5, exp: 40, gold: 30 },
+    { name: 'Lobo Salvaje', hp: 70, attack: 20, defense: 6, exp: 42, gold: 28 }
+  ],
+  strong: [
+    { name: 'Dragón Joven', hp: 150, attack: 35, defense: 15, exp: 100, gold: 80 },
+    { name: 'Golem de Piedra', hp: 200, attack: 25, defense: 25, exp: 120, gold: 90 },
+    { name: 'Mago Oscuro', hp: 120, attack: 40, defense: 10, exp: 110, gold: 85 }
+  ],
+  boss: [
+    { name: 'Rey Demonio', hp: 500, attack: 60, defense: 30, exp: 300, gold: 250 },
+    { name: 'Dragón Anciano', hp: 600, attack: 55, defense: 35, exp: 350, gold: 300 },
+    { name: 'Lich Supremo', hp: 450, attack: 70, defense: 25, exp: 280, gold: 220 }
+  ]
+};
+
+// Sistema de items
+const ITEMS = {
+  weapons: {
+    'Espada de Madera': { attack: 5, price: 0 },
+    'Espada de Hierro': { attack: 15, price: 200 },
+    'Espada de Acero': { attack: 25, price: 500 },
+    'Espada Mágica': { attack: 40, price: 1200 },
+    'Excalibur': { attack: 60, price: 3000 }
+  },
+  armors: {
+    'Ropa Simple': { defense: 2, price: 0 },
+    'Armadura de Cuero': { defense: 8, price: 150 },
+    'Armadura de Hierro': { defense: 15, price: 400 },
+    'Armadura Mágica': { defense: 25, price: 1000 },
+    'Armadura Divina': { defense: 40, price: 2500 }
+  },
+  consumables: {
+    'Poción de Vida': { hp: 50, price: 25 },
+    'Poción de Maná': { mp: 30, price: 20 },
+    'Poción Grande de Vida': { hp: 100, price: 60 },
+    'Elixir Completo': { hp: 200, mp: 100, price: 150 }
+  }
+};
+
+// Función para obtener enemigo aleatorio basado en nivel
+function getRandomEnemy(playerLevel) {
+  let enemyType;
+  
+  if (playerLevel <= 5) enemyType = 'weak';
+  else if (playerLevel <= 15) enemyType = Math.random() < 0.7 ? 'weak' : 'normal';
+  else if (playerLevel <= 30) enemyType = Math.random() < 0.5 ? 'normal' : 'strong';
+  else enemyType = Math.random() < 0.8 ? 'strong' : 'boss';
+  
+  const enemyList = ENEMIES[enemyType];
+  const baseEnemy = enemyList[Math.floor(Math.random() * enemyList.length)];
+  
+  // Escalar enemigo según el nivel del jugador
+  const levelMultiplier = 1 + (playerLevel - 1) * 0.1;
+  
+  return {
+    ...baseEnemy,
+    hp: Math.floor(baseEnemy.hp * levelMultiplier),
+    maxHp: Math.floor(baseEnemy.hp * levelMultiplier),
+    attack: Math.floor(baseEnemy.attack * levelMultiplier),
+    defense: Math.floor(baseEnemy.defense * levelMultiplier),
+    exp: Math.floor(baseEnemy.exp * levelMultiplier),
+    gold: Math.floor(baseEnemy.gold * levelMultiplier)
+  };
+}
+
+// Función de combate
+function simulateBattle(player, enemyData) {
+  const battle = {
+    player: {
+      name: player.name,
+      hp: player.hp,
+      maxHp: player.maxHp,
+      attack: player.attack + (ITEMS.weapons[player.equipment.weapon]?.attack || 0),
+      defense: player.defense + (ITEMS.armors[player.equipment.armor]?.defense || 0)
+    },
+    enemy: {
+      name: enemyData.name,
+      hp: enemyData.hp,
+      maxHp: enemyData.maxHp,
+      attack: enemyData.attack,
+      defense: enemyData.defense
+    },
+    log: [],
+    winner: null
+  };
+
+  let round = 1;
+  
+  while (battle.player.hp > 0 && battle.enemy.hp > 0 && round <= 20) {
+    // Turno del jugador
+    const playerDamage = Math.max(1, battle.player.attack - battle.enemy.defense + Math.floor(Math.random() * 10) - 5);
+    battle.enemy.hp -= playerDamage;
+    battle.log.push(`⚔️ ${battle.player.name} ataca a ${battle.enemy.name} por ${playerDamage} de daño`);
+    
+    if (battle.enemy.hp <= 0) {
+      battle.winner = 'player';
+      battle.log.push(`🏆 ¡${battle.player.name} ha vencido a ${battle.enemy.name}!`);
+      break;
+    }
+    
+    // Turno del enemigo
+    const enemyDamage = Math.max(1, battle.enemy.attack - battle.player.defense + Math.floor(Math.random() * 8) - 4);
+    battle.player.hp -= enemyDamage;
+    battle.log.push(`💥 ${battle.enemy.name} ataca a ${battle.player.name} por ${enemyDamage} de daño`);
+    
+    if (battle.player.hp <= 0) {
+      battle.winner = 'enemy';
+      battle.log.push(`💀 ${battle.player.name} ha sido derrotado por ${battle.enemy.name}...`);
+      break;
+    }
+    
+    round++;
+  }
+  
+  if (round > 20) {
+    battle.winner = 'draw';
+    battle.log.push(`⏰ ¡El combate terminó en empate por tiempo!`);
+  }
+  
+  return battle;
+}
+
+// Función para calcular nivel siguiente
+function getExpForNextLevel(level) {
+  return Math.floor(100 * Math.pow(1.2, level - 1));
 }
 
 // Función para subir de nivel
 function levelUp(player) {
-  if (player.exp >= player.expToNext) {
+  const oldLevel = player.level;
+  let levelsGained = 0;
+  
+  while (player.exp >= player.expNext) {
+    player.exp -= player.expNext;
     player.level++;
-    player.exp -= player.expToNext;
+    levelsGained++;
     
-    // Aumentar stats base
+    // Aumentar stats al subir de nivel
     const hpIncrease = Math.floor(Math.random() * 20) + 15;
-    const manaIncrease = Math.floor(Math.random() * 15) + 10;
-    const attackIncrease = Math.floor(Math.random() * 8) + 5;
-    const defenseIncrease = Math.floor(Math.random() * 6) + 3;
+    const mpIncrease = Math.floor(Math.random() * 10) + 8;
+    const attackIncrease = Math.floor(Math.random() * 5) + 3;
+    const defenseIncrease = Math.floor(Math.random() * 4) + 2;
+    const speedIncrease = Math.floor(Math.random() * 3) + 1;
     
     player.maxHp += hpIncrease;
-    player.hp = player.maxHp; // Curar al subir de nivel
-    player.maxMana += manaIncrease;
-    player.mana = player.maxMana;
+    player.maxMp += mpIncrease;
     player.attack += attackIncrease;
     player.defense += defenseIncrease;
+    player.speed += speedIncrease;
     
-    player.expToNext = Math.floor(player.expToNext * 1.5);
+    // Restaurar HP y MP al subir de nivel
+    player.hp = player.maxHp;
+    player.mp = player.maxMp;
     
-    return {
-      leveledUp: true,
-      newLevel: player.level,
-      increases: { hp: hpIncrease, mana: manaIncrease, attack: attackIncrease, defense: defenseIncrease }
-    };
-  }
-  return { leveledUp: false };
-}
-
-// Función para obtener enemigo aleatorio
-function getRandomEnemy(playerLevel) {
-  const enemyLevel = Math.max(1, Math.min(5, playerLevel + Math.floor(Math.random() * 3) - 1));
-  const enemies = ENEMIES[enemyLevel];
-  const baseEnemy = enemies[Math.floor(Math.random() * enemies.length)];
-  
-  // Crear copia y ajustar stats según nivel del jugador
-  if (playerLevel > enemyLevel) {
-    const multiplier = 1 + (playerLevel - enemyLevel) * 0.2;
-    enemy.hp = Math.floor(enemy.hp * multiplier);
-    enemy.attack = Math.floor(enemy.attack * multiplier);
-    enemy.defense = Math.floor(enemy.defense * multiplier);
-    enemy.exp = Math.floor(enemy.exp * multiplier);
-    enemy.gold = Math.floor(enemy.gold * multiplier);
+    player.expNext = getExpForNextLevel(player.level);
   }
   
-  enemy.maxHp = enemy.hp;
-  return enemy;
-}
-
-// Función de combate
-function calculateDamage(attacker, defender) {
-  const baseDamage = attacker.attack;
-  const defense = defender.defense;
-  const randomFactor = 0.8 + Math.random() * 0.4; // 80% - 120%
-  
-  const damage = Math.max(1, Math.floor((baseDamage - defense * 0.5) * randomFactor));
-  return damage;
+  return levelsGained;
 }
 
 module.exports = (bot) => {
-  // Comando principal /rpg
   bot.onText(/^\/rpg(?:\s+(.+))?$/, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
-    const userName = msg.from.first_name || 'Aventurero';
     const action = match[1] ? match[1].toLowerCase().trim() : 'perfil';
 
-    const player = getPlayer(userId);
-
     try {
+      const player = getUserProfile(userId);
+
       switch (action) {
-        case 'crear':
-        case 'empezar':
-        case 'start':
-          if (player.name) {
-            return bot.sendMessage(chatId, `❌ Ya tienes un personaje creado: *${player.name}*\n\nUsa /rpg perfil para ver tus stats.`, { parse_mode: 'Markdown' });
-          }
-
-          return bot.sendMessage(chatId, `🎮 *¡Bienvenido a MayRPG!* ⚔️
-
-¡Hola *${userName}*! Es hora de crear tu aventurero.
-
-🔮 *Clases disponibles:*
-⚔️ **Guerrero** - Tanque resistente con alta defensa
-🔮 **Mago** - Maestro de la magia con alto daño
-🏹 **Arquero** - Atacante ágil y certero
-✨ **Paladín** - Híbrido que puede curar y atacar
-
-Para elegir tu clase, usa:
-/rpg clase warrior (o mage, archer, paladin)
-
-> 💖 *Creado con amor por SoyMaycol*`, { parse_mode: 'Markdown' });
-
-        case 'clase':
-          const args = match[1].split(' ');
-          if (args.length < 2) {
-            return bot.sendMessage(chatId, `❌ Especifica una clase: warrior, mage, archer, paladin\n\nEjemplo: /rpg clase warrior`, { parse_mode: 'Markdown' });
-          }
-
-          const selectedClass = args[1].toLowerCase();
-          if (!CLASSES[selectedClass]) {
-            return bot.sendMessage(chatId, `❌ Clase no válida. Usa: warrior, mage, archer, paladin`);
-          }
-
-          if (player.name) {
-            return bot.sendMessage(chatId, `❌ Ya tienes un personaje creado. No puedes cambiar de clase.`);
-          }
-
-          const classData = CLASSES[selectedClass];
-          player.name = userName;
-          player.class = selectedClass;
-          player.hp = classData.baseHp;
-          player.maxHp = classData.baseHp;
-          player.mana = classData.baseMana;
-          player.maxMana = classData.baseMana;
-          player.attack = classData.baseAttack;
-          player.defense = classData.baseDefense;
-
-          savePlayer(userId, player);
-
-          return bot.sendMessage(chatId, `✅ *¡Personaje creado exitosamente!*
-
-👤 **Nombre:** ${player.name}
-${classData.name}
-
-📊 **Stats iniciales:**
-❤️ HP: ${player.hp}/${player.maxHp}
-💙 Maná: ${player.mana}/${player.maxMana}
-⚔️ Ataque: ${player.attack}
-🛡️ Defensa: ${player.defense}
-💰 Oro: ${player.gold}
-
-🎯 **Habilidades:** ${classData.skills.join(', ')}
-
-¡Usa /rpg aventura para comenzar a explorar!
-
-> 🌟 *¡Tu aventura comienza ahora!*`, { parse_mode: 'Markdown' });
-
         case 'perfil':
+        case 'profile':
         case 'stats':
-        case 'estado':
-          if (!player.name) {
-            return bot.sendMessage(chatId, `❌ Primero crea tu personaje con /rpg crear`);
-          }
-
-          const classInfo = CLASSES[player.class];
-          let equipmentText = '';
+          const weaponBonus = ITEMS.weapons[player.equipment.weapon]?.attack || 0;
+          const armorBonus = ITEMS.armors[player.equipment.armor]?.defense || 0;
           
-          if (player.equipment.weapon) {
-            const weapon = ITEMS.weapons[player.equipment.weapon];
-            equipmentText += `⚔️ ${weapon.name}\n`;
-          }
-          if (player.equipment.armor) {
-            const armor = ITEMS.armor[player.equipment.armor];
-            equipmentText += `🛡️ ${armor.name}\n`;
-          }
+          let profileMsg = `🎮 **MAYРPG - Perfil de ${player.name}** 🎮
 
-          return bot.sendMessage(chatId, `👤 **PERFIL DE ${player.name.toUpperCase()}**
-━━━━━━━━━━━━━━━━━━━━━
+📊 **Estados:**
+▫️ Nivel: ${player.level}
+▫️ EXP: ${player.exp}/${player.expNext}
+▫️ HP: ${player.hp}/${player.maxHp}
+▫️ MP: ${player.mp}/${player.maxMp}
 
-${classInfo.name} • Nivel ${player.level}
+⚔️ **Atributos:**
+▫️ Ataque: ${player.attack} (+${weaponBonus})
+▫️ Defensa: ${player.defense} (+${armorBonus})
+▫️ Velocidad: ${player.speed}
 
-📊 **ESTADÍSTICAS:**
-❤️ HP: ${player.hp}/${player.maxHp}
-💙 Maná: ${player.mana}/${player.maxMana}
-⚔️ Ataque: ${player.attack}
-🛡️ Defensa: ${player.defense}
-✨ EXP: ${player.exp}/${player.expToNext}
+💰 **Recursos:**
+▫️ Oro: ${player.gold}
+▫️ Ubicación: ${player.location}
 
-💰 **Oro:** ${player.gold}
-📍 **Ubicación:** ${player.location === 'town' ? '🏘️ Pueblo' : '🌲 Aventura'}
+🎒 **Equipamiento:**
+▫️ Arma: ${player.equipment.weapon}
+▫️ Armadura: ${player.equipment.armor}
+▫️ Accesorio: ${player.equipment.accessory || 'Ninguno'}
 
-${equipmentText ? `🎒 **EQUIPAMIENTO:**\n${equipmentText}` : ''}
+📈 **Estadísticas:**
+▫️ Monstruos derrotados: ${player.stats.monstersKilled}
+▫️ Aventuras completadas: ${player.stats.adventuresCompleted}
+▫️ Oro ganado: ${player.stats.goldEarned}
 
-🏆 **LOGROS:**
-⚔️ Batallas ganadas: ${player.stats.battlesWon}
-👹 Enemigos derrotados: ${player.stats.enemiesKilled}
-💰 Oro ganado: ${player.stats.goldEarned}
+> 💖 MayRPG por SoyMaycol`;
 
-> 💖 *MayRPG - Aventuras épicas te esperan*`, { parse_mode: 'Markdown' });
+          await bot.sendMessage(chatId, profileMsg, { parse_mode: 'Markdown' });
+          break;
 
         case 'aventura':
-        case 'explorar':
-          if (!player.name) {
-            return bot.sendMessage(chatId, `❌ Primero crea tu personaje con /rpg crear`);
-          }
-
-          if (player.inBattle) {
-            return bot.sendMessage(chatId, `⚔️ ¡Ya estás en batalla! Usa /rpg atacar, /rpg huir o /rpg habilidad`);
-          }
-
-          if (player.hp <= 0) {
-            return bot.sendMessage(chatId, `💀 Estás derrotado. Usa /rpg curar para recuperarte (cuesta 50 oro)`);
-          }
-
-          const enemy = getRandomEnemy(player.level);
-          player.inBattle = true;
-          player.battleData = enemy;
-          player.location = 'battle';
-
-          savePlayer(userId, player);
-
-          return bot.sendMessage(chatId, `🌲 *Explorando el bosque...*
-
-⚔️ **¡ENEMIGO ENCONTRADO!**
-
-${enemy.name}
-❤️ HP: ${enemy.hp}/${enemy.maxHp}
-⚔️ Ataque: ${enemy.attack}
-🛡️ Defensa: ${enemy.defense}
-
-💰 **Recompensas:** ${enemy.gold} oro, ${enemy.exp} EXP
-
-**¿Qué harás?**
-/rpg atacar - Atacar al enemigo
-/rpg habilidad - Usar habilidad especial
-/rpg huir - Huir del combate (50% probabilidad)
-
-> ⚔️ *¡La batalla comienza!*`, { parse_mode: 'Markdown' });
-
-        case 'atacar':
-        case 'attack':
-          if (!player.inBattle || !player.battleData) {
-            return bot.sendMessage(chatId, `❌ No estás en combate. Usa /rpg aventura para encontrar enemigos.`);
-          }
-
-          const enemy = player.battleData;
+        case 'adventure':
+        case 'hunt':
+          const now = Date.now();
+          const cooldown = 30000; // 30 segundos
           
-          // Turno del jugador
-          const playerDamage = calculateDamage(player, enemy);
-          enemy.hp -= playerDamage;
-
-          let battleResult = `⚔️ **COMBATE**
-
-Tu ataque: -${playerDamage} HP
-${enemy.name}: ${Math.max(0, enemy.hp)}/${enemy.maxHp} HP\n`;
-
-          // Verificar si el enemigo murió
-          if (enemy.hp <= 0) {
-            player.exp += enemy.exp;
-            player.gold += enemy.gold;
-            player.stats.battlesWon++;
-            player.stats.enemiesKilled++;
-            player.stats.goldEarned += enemy.gold;
-            
-            // Reset battle
-            player.inBattle = false;
-            player.battleData = null;
-            player.location = 'town';
-
-            const levelUpResult = levelUp(player);
-            
-            battleResult += `\n🏆 **¡VICTORIA!**
-+${enemy.exp} EXP
-+${enemy.gold} oro
-
-`;
-
-            if (levelUpResult.leveledUp) {
-              battleResult += `🎉 **¡SUBISTE DE NIVEL!**
-Nivel ${levelUpResult.newLevel}
-+${levelUpResult.increases.hp} HP máximo
-+${levelUpResult.increases.mana} Maná máximo
-+${levelUpResult.increases.attack} Ataque
-+${levelUpResult.increases.defense} Defensa
-
-❤️ ¡HP y Maná restaurados!
-
-`;
-            }
-
-            savePlayer(userId, player);
-            return bot.sendMessage(chatId, battleResult + `> 🌟 *¡Usa /rpg aventura para más batallas!*`, { parse_mode: 'Markdown' });
+          if (now - player.lastAdventure < cooldown) {
+            const timeLeft = Math.ceil((cooldown - (now - player.lastAdventure)) / 1000);
+            return bot.sendMessage(chatId, `⏰ Debes esperar ${timeLeft} segundos antes de tu próxima aventura.`);
           }
 
-          // Turno del enemigo
-          const enemyDamage = calculateDamage(enemy, player);
-          player.hp -= enemyDamage;
-
-          battleResult += `${enemy.name} ataca: -${enemyDamage} HP
-Tu HP: ${Math.max(0, player.hp)}/${player.maxHp}\n`;
-
-          // Verificar si el jugador murió
           if (player.hp <= 0) {
-            player.hp = 0;
-            player.inBattle = false;
-            player.battleData = null;
-            player.location = 'town';
-            
-            savePlayer(userId, player);
-            return bot.sendMessage(chatId, battleResult + `\n💀 **¡HAS SIDO DERROTADO!**
-
-Usa /rpg curar para recuperarte (50 oro)
-O espera 1 hora para curación gratuita.
-
-> 💔 *¡No te rindas, aventurero!*`, { parse_mode: 'Markdown' });
+            return bot.sendMessage(chatId, `💀 No puedes aventurarte estando derrotado. Usa */rpg curar* para restaurar tu HP.`, { parse_mode: 'Markdown' });
           }
 
-          savePlayer(userId, player);
-          return bot.sendMessage(chatId, battleResult + `\n**¿Qué harás ahora?**
-/rpg atacar - Continuar atacando
-/rpg habilidad - Usar habilidad
-/rpg huir - Intentar huir`, { parse_mode: 'Markdown' });
+          const randomEnemy = getRandomEnemy(player.level);
+          const battle = simulateBattle(player, randomEnemy);
 
-        case 'huir':
-        case 'escape':
-          if (!player.inBattle) {
-            return bot.sendMessage(chatId, `❌ No estás en combate.`);
-          }
+          let battleMsg = `⚔️ **COMBATE** ⚔️
 
-          const escapeChance = Math.random();
-          if (escapeChance > 0.5) {
-            player.inBattle = false;
-            player.battleData = null;
-            player.location = 'town';
-            savePlayer(userId, player);
+🧑‍💻 **${battle.player.name}** vs 👹 **${randomEnemy.name}**
+
+${battle.log.slice(0, 6).join('\n')}
+
+`;
+
+          if (battle.winner === 'player') {
+            // Jugador gana
+            const expGained = randomEnemy.exp;
+            const goldGained = randomEnemy.gold;
             
-            return bot.sendMessage(chatId, `🏃‍♂️ **¡Escapaste exitosamente!**
+            player.exp += expGained;
+            player.gold += goldGained;
+            player.hp = battle.player.hp;
+            player.lastAdventure = now;
+            player.stats.monstersKilled++;
+            player.stats.adventuresCompleted++;
+            player.stats.goldEarned += goldGained;
 
-Has vuelto al pueblo sano y salvo.
-Usa /rpg aventura cuando estés listo para más combate.
+            // Verificar subida de nivel
+            const levelsGained = levelUp(player);
+            
+            battleMsg += `🏆 **¡VICTORIA!**
+💰 +${goldGained} oro
+⭐ +${expGained} EXP`;
 
-> 🛡️ *Vivir para luchar otro día*`, { parse_mode: 'Markdown' });
-          } else {
-            // Falló el escape, el enemigo ataca
-            const enemy = player.battleData;
-            const damage = calculateDamage(enemy, player);
-            player.hp -= damage;
-
-            if (player.hp <= 0) {
-              player.hp = 0;
-              player.inBattle = false;
-              player.battleData = null;
-              player.location = 'town';
+            if (levelsGained > 0) {
+              battleMsg += `\n\n🎉 **¡SUBISTE ${levelsGained} NIVEL${levelsGained > 1 ? 'ES' : ''}!**
+📈 Ahora eres nivel ${player.level}
+❤️ HP y MP completamente restaurados`;
             }
 
-            savePlayer(userId, player);
+            // Posibilidad de encontrar item (10%)
+            if (Math.random() < 0.1) {
+              const items = Object.keys(ITEMS.consumables);
+              const randomItem = items[Math.floor(Math.random() * items.length)];
+              
+              if (!player.inventory[randomItem]) player.inventory[randomItem] = 0;
+              player.inventory[randomItem]++;
+              
+              battleMsg += `\n🎁 ¡Encontraste: ${randomItem}!`;
+            }
+
+          } else if (battle.winner === 'enemy') {
+            // Jugador pierde
+            const goldLost = Math.floor(player.gold * 0.1);
+            player.gold = Math.max(0, player.gold - goldLost);
+            player.hp = 0;
+            player.lastAdventure = now;
+
+            battleMsg += `💀 **DERROTA...**
+💸 Perdiste ${goldLost} oro
+🏥 Necesitas curarte antes de continuar`;
+
+          } else {
+            // Empate
+            player.hp = battle.player.hp;
+            player.lastAdventure = now;
             
-            return bot.sendMessage(chatId, `❌ **¡No pudiste escapar!**
-
-${enemy.name} te alcanza y ataca: -${damage} HP
-Tu HP: ${Math.max(0, player.hp)}/${player.maxHp}
-
-${player.hp <= 0 ? 
-              '💀 Has sido derrotado. Usa /rpg curar para recuperarte.' : 
-              '⚔️ ¡Sigue luchando! /rpg atacar'
-            }`, { parse_mode: 'Markdown' });
+            battleMsg += `⚖️ **EMPATE**
+⏰ El combate fue muy reñido`;
           }
+
+          updateUserProfile(userId, player);
+          await bot.sendMessage(chatId, battleMsg, { parse_mode: 'Markdown' });
+          break;
 
         case 'curar':
         case 'heal':
-          if (player.hp >= player.maxHp) {
-            return bot.sendMessage(chatId, `❤️ Ya tienes la vida completa (${player.hp}/${player.maxHp})`);
+        case 'descansar':
+          if (player.hp >= player.maxHp && player.mp >= player.maxMp) {
+            return bot.sendMessage(chatId, `😊 Ya tienes la salud y maná al máximo.`);
           }
 
-          if (player.gold < 50) {
-            return bot.sendMessage(chatId, `💰 No tienes suficiente oro para curarte (necesitas 50, tienes ${player.gold})`);
+          const healCost = Math.floor(player.maxHp * 0.3);
+          
+          if (player.gold < healCost) {
+            return bot.sendMessage(chatId, `💸 Necesitas ${healCost} oro para curarte. Tienes ${player.gold} oro.`);
           }
 
-          player.gold -= 50;
           player.hp = player.maxHp;
-          player.mana = player.maxMana;
-          
-          savePlayer(userId, player);
-          
-          return bot.sendMessage(chatId, `✨ **¡Te has curado completamente!**
+          player.mp = player.maxMp;
+          player.gold -= healCost;
+          player.stats.timesHealed++;
 
-❤️ HP: ${player.hp}/${player.maxHp}
-💙 Maná: ${player.mana}/${player.maxMana}
-💰 Oro restante: ${player.gold}
+          updateUserProfile(userId, player);
+          
+          await bot.sendMessage(chatId, `🏥 **CURACIÓN COMPLETA**
 
-> 🌟 *¡Listo para la aventura!*`, { parse_mode: 'Markdown' });
+❤️ HP restaurado: ${player.maxHp}/${player.maxHp}
+💙 MP restaurado: ${player.maxMp}/${player.maxMp}
+💰 Costo: ${healCost} oro
+💵 Oro restante: ${player.gold}
+
+> ¡Listo para nuevas aventuras!`, { parse_mode: 'Markdown' });
+          break;
+
+        case 'inventario':
+        case 'inventory':
+        case 'items':
+          let inventoryMsg = `🎒 **INVENTARIO DE ${player.name.toUpperCase()}**\n\n`;
+          
+          const items = Object.entries(player.inventory);
+          if (items.length === 0) {
+            inventoryMsg += `📦 Tu inventario está vacío.`;
+          } else {
+            items.forEach(([item, quantity]) => {
+              inventoryMsg += `▫️ ${item}: ${quantity}\n`;
+            });
+          }
+
+          inventoryMsg += `\n💰 **Oro:** ${player.gold}`;
+          inventoryMsg += `\n\n> Usa */rpg usar [item]* para consumir items`;
+
+          await bot.sendMessage(chatId, inventoryMsg, { parse_mode: 'Markdown' });
+          break;
 
         case 'tienda':
         case 'shop':
-          return bot.sendMessage(chatId, `🏪 **TIENDA DE AVENTUREROS**
-━━━━━━━━━━━━━━━━━━━━━
+        case 'store':
+          let shopMsg = `🏪 **TIENDA MAYРPG** 🏪
 
-💰 *Tu oro: ${player.gold}*
+💰 Tu oro: **${player.gold}**
 
-**🗡️ ARMAS:**
-• Espada de Madera - 50 oro (+5 ATK)
-• Espada de Hierro - 200 oro (+15 ATK)
-• Bastón Mágico - 300 oro (+20 ATK, +10 MANA)
-• Arco Élfico - 250 oro (+18 ATK)
-
-**🛡️ ARMADURAS:**
-• Armadura de Cuero - 80 oro (+8 DEF)
-• Armadura de Hierro - 300 oro (+15 DEF)
-• Túnica Mágica - 250 oro (+10 DEF, +20 MANA)
-
-**💊 CONSUMIBLES:**
-• Poción de Vida - 30 oro (+50 HP)
-• Poción de Maná - 25 oro (+30 MANA)
-
-Para comprar: /rpg comprar [item]
-Ejemplo: /rpg comprar espada_hierro
-
-> 🛒 *¡Equípate para la aventura!*`, { parse_mode: 'Markdown' });
-
-        case 'inventario':
-        case 'inv':
-          let invText = `🎒 **INVENTARIO**
-━━━━━━━━━━━━━━━━━━━━━
-
-💰 *Oro: ${player.gold}*\n`;
-
-          const inv = player.inventory;
-          let hasItems = false;
-
-          if (Object.keys(inv.weapons).length > 0) {
-            invText += '\n🗡️ **ARMAS:**\n';
-            for (const [key, qty] of Object.entries(inv.weapons)) {
-              const item = ITEMS.weapons[key];
-              invText += `• ${item.name} x${qty}\n`;
-              hasItems = true;
+⚔️ **ARMAS:**
+`;
+          Object.entries(ITEMS.weapons).forEach(([weapon, stats]) => {
+            if (stats.price > 0) {
+              shopMsg += `▫️ ${weapon} - ${stats.price} oro (+${stats.attack} ATK)\n`;
             }
-          }
+          });
 
-          if (Object.keys(inv.armor).length > 0) {
-            invText += '\n🛡️ **ARMADURAS:**\n';
-            for (const [key, qty] of Object.entries(inv.armor)) {
-              const item = ITEMS.armor[key];
-              invText += `• ${item.name} x${qty}\n`;
-              hasItems = true;
+          shopMsg += `\n🛡️ **ARMADURAS:**
+`;
+          Object.entries(ITEMS.armors).forEach(([armor, stats]) => {
+            if (stats.price > 0) {
+              shopMsg += `▫️ ${armor} - ${stats.price} oro (+${stats.defense} DEF)\n`;
             }
-          }
+          });
 
-          if (Object.keys(inv.consumables).length > 0) {
-            invText += '\n💊 **CONSUMIBLES:**\n';
-            for (const [key, qty] of Object.entries(inv.consumables)) {
-              const item = ITEMS.consumables[key];
-              invText += `• ${item.name} x${qty}\n`;
-              hasItems = true;
-            }
-          }
+          shopMsg += `\n🧪 **CONSUMIBLES:**
+`;
+          Object.entries(ITEMS.consumables).forEach(([item, stats]) => {
+            const effects = [];
+            if (stats.hp) effects.push(`+${stats.hp} HP`);
+            if (stats.mp) effects.push(`+${stats.mp} MP`);
+            shopMsg += `▫️ ${item} - ${stats.price} oro (${effects.join(', ')})\n`;
+          });
 
-          if (!hasItems) {
-            invText += '\n📦 *Tu inventario está vacío*\n¡Visita /rpg tienda para comprar items!';
-          }
+          shopMsg += `\n> Usa */rpg comprar [item]* para comprar`;
 
-          invText += '\n\nPara usar items: /rpg usar [item]';
+          await bot.sendMessage(chatId, shopMsg, { parse_mode: 'Markdown' });
+          break;
 
-          return bot.sendMessage(chatId, invText, { parse_mode: 'Markdown' });
-
-        case 'ayuda':
         case 'help':
         case 'comandos':
-          return bot.sendMessage(chatId, `📋 **COMANDOS DE MAYRPG**
-━━━━━━━━━━━━━━━━━━━━━
+        case 'ayuda':
+          const helpMsg = `🎮 **MAYРPG - COMANDOS** 🎮
 
-🎮 **BÁSICOS:**
-/rpg crear - Crear personaje
-/rpg perfil - Ver estadísticas
-/rpg aventura - Explorar y combatir
+📊 **Información:**
+▫️ */rpg* - Ver tu perfil
+▫️ */rpg inventario* - Ver items
+▫️ */rpg tienda* - Ver tienda
 
-⚔️ **COMBATE:**
-/rpg atacar - Atacar enemigo
-/rpg huir - Huir del combate
-/rpg habilidad - Usar habilidad
+⚔️ **Acciones:**
+▫️ */rpg aventura* - Ir de aventura
+▫️ */rpg curar* - Restaurar HP/MP
+▫️ */rpg usar [item]* - Usar item
+▫️ */rpg comprar [item]* - Comprar item
+▫️ */rpg equipar [item]* - Equipar arma/armadura
 
-🏪 **TIENDA E ITEMS:**
-/rpg tienda - Ver tienda
-/rpg inventario - Ver inventario
-/rpg comprar [item] - Comprar item
-/rpg usar [item] - Usar item
+🏆 **Otros:**
+▫️ */rpg ranking* - Ver ranking
+▫️ */rpg reset* - Reiniciar perfil
 
-❤️ **OTROS:**
-/rpg curar - Curarse (50 oro)
-/rpg ayuda - Ver esta ayuda
+> 💖 MayRPG creado por SoyMaycol`;
 
-> 💖 *MayRPG - ¡Tu aventura épica!*`, { parse_mode: 'Markdown' });
+          await bot.sendMessage(chatId, helpMsg, { parse_mode: 'Markdown' });
+          break;
 
         default:
-          if (action.startsWith('comprar ')) {
-            const itemName = action.substring(8).trim();
-            // Lógica de compra aquí
-            return bot.sendMessage(chatId, `🛒 Sistema de compras en desarrollo...`);
+          // Verificar si es un comando específico con parámetros
+          if (action.startsWith('usar ') || action.startsWith('use ')) {
+            const itemName = action.substring(action.indexOf(' ') + 1);
+            
+            if (!player.inventory[itemName] || player.inventory[itemName] <= 0) {
+              return bot.sendMessage(chatId, `❌ No tienes "${itemName}" en tu inventario.`);
+            }
+
+            const item = ITEMS.consumables[itemName];
+            if (!item) {
+              return bot.sendMessage(chatId, `❌ "${itemName}" no es un item consumible.`);
+            }
+
+            let used = false;
+            let effectMsg = '';
+
+            if (item.hp && player.hp < player.maxHp) {
+              const hpRestored = Math.min(item.hp, player.maxHp - player.hp);
+              player.hp += hpRestored;
+              effectMsg += `❤️ +${hpRestored} HP `;
+              used = true;
+            }
+
+            if (item.mp && player.mp < player.maxMp) {
+              const mpRestored = Math.min(item.mp, player.maxMp - player.mp);
+              player.mp += mpRestored;
+              effectMsg += `💙 +${mpRestored} MP `;
+              used = true;
+            }
+
+            if (!used) {
+              return bot.sendMessage(chatId, `😊 Ya tienes la salud y maná al máximo.`);
+            }
+
+            player.inventory[itemName]--;
+            if (player.inventory[itemName] <= 0) {
+              delete player.inventory[itemName];
+            }
+
+            updateUserProfile(userId, player);
+            
+            await bot.sendMessage(chatId, `✨ **ITEM USADO**
+
+🧪 Usaste: ${itemName}
+${effectMsg}
+
+❤️ HP: ${player.hp}/${player.maxHp}
+💙 MP: ${player.mp}/${player.maxMp}`, { parse_mode: 'Markdown' });
+
+          } else if (action.startsWith('comprar ') || action.startsWith('buy ')) {
+            const itemName = action.substring(action.indexOf(' ') + 1);
+            
+            // Buscar item en todas las categorías
+            let item = null;
+            let category = null;
+            
+            if (ITEMS.weapons[itemName]) {
+              item = ITEMS.weapons[itemName];
+              category = 'weapon';
+            } else if (ITEMS.armors[itemName]) {
+              item = ITEMS.armors[itemName];
+              category = 'armor';
+            } else if (ITEMS.consumables[itemName]) {
+              item = ITEMS.consumables[itemName];
+              category = 'consumable';
+            }
+
+            if (!item) {
+              return bot.sendMessage(chatId, `❌ "${itemName}" no está disponible en la tienda.`);
+            }
+
+            if (player.gold < item.price) {
+              return bot.sendMessage(chatId, `💸 No tienes suficiente oro. Necesitas ${item.price} oro, tienes ${player.gold}.`);
+            }
+
+            player.gold -= item.price;
+
+            if (category === 'consumable') {
+              if (!player.inventory[itemName]) player.inventory[itemName] = 0;
+              player.inventory[itemName]++;
+            } else if (category === 'weapon') {
+              player.equipment.weapon = itemName;
+            } else if (category === 'armor') {
+              player.equipment.armor = itemName;
+            }
+
+            updateUserProfile(userId, player);
+
+            let purchaseMsg = `🛒 **COMPRA REALIZADA**
+
+🎁 Compraste: ${itemName}
+💰 Costo: ${item.price} oro
+💵 Oro restante: ${player.gold}`;
+
+            if (category === 'weapon') {
+              purchaseMsg += `\n⚔️ ¡Arma equipada automáticamente! (+${item.attack} ATK)`;
+            } else if (category === 'armor') {
+              purchaseMsg += `\n🛡️ ¡Armadura equipada automáticamente! (+${item.defense} DEF)`;
+            }
+
+            await bot.sendMessage(chatId, purchaseMsg, { parse_mode: 'Markdown' });
+
+          } else {
+            await bot.sendMessage(chatId, `❓ Comando no reconocido. Usa */rpg help* para ver todos los comandos disponibles.`, { parse_mode: 'Markdown' });
           }
-          
-          return bot.sendMessage(chatId, `❓ Acción no reconocida: "${action}"\n\nUsa /rpg ayuda para ver todos los comandos disponibles.`);
+          break;
       }
+
     } catch (error) {
       console.error('Error en MayRPG:', error);
-      return bot.sendMessage(chatId, `❌ Error interno del juego. Inténtalo de nuevo.`);
+      await bot.sendMessage(chatId, `❌ Ocurrió un error en el RPG. Por favor intenta de nuevo.`);
     }
   });
 };
