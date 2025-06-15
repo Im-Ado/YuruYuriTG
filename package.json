@@ -28,7 +28,6 @@
     "formdata-node": "*",
     "aptoide-scraper": "github:SoySapo6/MayAptoide",
     "node-fetch": "^3.2.10",
-    "fetch": "*",
     "axios": "^1.6.8",
     "form-data": "^4.0.0",
     "file-type": "*",
