@@ -1,78 +1,59 @@
-const { search, download } = require('aptoide-scraper');
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
-const crypto = require("crypto");
-const { FormData, Blob } = require("formdata-node");
-const fileType = require("file-type");
-
-const emoji = '📦';
-const emoji2 = '🚫';
-const rwait = '🕒';
-const done = '✅';
-const error = '❌';
-const fkontak = {}; // Puedes personalizar si usas algún contacto fake
-const dev = 'SoyMaycol';
+const { search, download } = require("aptoide-scraper");
 
 module.exports = (bot) => {
-  bot.onText(/^\/(apk|modapk|aptoide) (.+)/i, async (msg, match) => {
+  bot.onText(/^\/(apk|modapk|aptoide)(?: (.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     const text = match[2];
 
     if (!text) {
-      return bot.sendMessage(chatId, `${emoji} Por favor, ingresa el nombre de la APK que deseas buscar.`);
+      return bot.sendMessage(chatId, "📲 Por favor, ingresa el nombre de la APK que deseas descargar.");
     }
 
+    bot.sendMessage(chatId, "⏳ Buscando la aplicación, espera un momento...");
+
     try {
-      await bot.sendMessage(chatId, `${rwait} Buscando tu aplicación...`);
-
       const searchA = await search(text);
-      const data5 = await download(searchA[0].id);
-
-      let txt = `*乂  APTOIDE - DESCARGAS* 乂\n\n`;
-      txt += `☁️ *Nombre* : ${data5.name}\n`;
-      txt += `🔖 *Package* : ${data5.package}\n`;
-      txt += `🚩 *Update* : ${data5.lastup}\n`;
-      txt += `⚖ *Peso* :  ${data5.size}`;
-
-      await bot.sendPhoto(chatId, data5.icon, { caption: txt });
-
-      if (data5.size.includes('GB') || parseFloat(data5.size.replace(' MB', '')) > 999) {
-        await bot.sendMessage(chatId, `${emoji2} El archivo es muy pesado. Subiéndolo a CatBox...`);
+      if (!searchA || searchA.length === 0) {
+        return bot.sendMessage(chatId, "❌ No se encontraron resultados para tu búsqueda.");
       }
 
-      const res = await fetch(data5.dllink);
-      const arrayBuffer = await res.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+      const data = await download(searchA[0].id);
 
-      const url = await subirACatbox(buffer);
-      await bot.sendMessage(chatId, `${done} APK subida a CatBox:\n🔗 ${url}`);
+      if (!data?.dllink) {
+        return bot.sendMessage(chatId, "❌ No se pudo obtener el enlace de descarga.");
+      }
+
+      const caption = `*🎮 Aptoide Downloader*\n\n` +
+        `📱 *Nombre:* ${data.name}\n` +
+        `📦 *Package:* ${data.package}\n` +
+        `🕓 *Actualizado:* ${data.lastup}\n` +
+        `📦 *Peso:* ${data.size}`;
+
+      if (data.icon) {
+        await bot.sendPhoto(chatId, data.icon, {
+          caption,
+          parse_mode: "HTML"
+        });
+      } else {
+        await bot.sendMessage(chatId, caption, { parse_mode: "HTML" });
+      }
+
+      const peso = parseFloat(data.size.replace(' MB', '').replace('GB', '')) || 0;
+      const isHeavy = data.size.includes("GB") || peso > 999;
+
+      if (isHeavy) {
+        return bot.sendMessage(chatId, "⚠️ El archivo es demasiado pesado para enviarlo por aquí.");
+      }
+
+      await bot.sendDocument(chatId, data.dllink, {
+        filename: `${data.name}.apk`,
+        caption: "✅ ¡Aquí tienes tu APK!",
+        contentType: "application/vnd.android.package-archive"
+      });
+
     } catch (err) {
-      console.error(err);
-      await bot.sendMessage(chatId, `${error} Ocurrió un fallo inesperado al descargar la APK.`);
+      console.error("Error descargando APK:", err);
+      bot.sendMessage(chatId, `❌ Hubo un error:\n\n${err.message}`);
     }
   });
 };
-
-// 🐱‍👤 Subida a CatBox sin errores
-async function subirACatbox(content) {
-  const { ext, mime } = (await fileType.fileTypeFromBuffer(content)) || {
-    ext: 'apk',
-    mime: 'application/vnd.android.package-archive',
-  };
-
-  const blob = new Blob([content], { type: mime });
-  const formData = new FormData();
-  const randomName = crypto.randomBytes(5).toString("hex");
-
-  formData.append("reqtype", "fileupload");
-  formData.append("fileToUpload", blob, `${randomName}.${ext}`);
-
-  const res = await fetch("https://catbox.moe/user/api.php", {
-    method: "POST",
-    body: formData,
-    headers: {
-      "User-Agent": "Mozilla/5.0",
-    },
-  });
-
-  return await res.text();
-}
