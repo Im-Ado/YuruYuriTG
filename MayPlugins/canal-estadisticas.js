@@ -1,17 +1,17 @@
-module.exports = (bot) => { bot.onText(/^/estadisticas$/, async (msg) => { if (msg.chat.type !== 'channel') return;
+const axios = require('axios');
 
-try {
-  const memberCount = await bot.getChatMembersCount(msg.chat.id);
+module.exports = (bot) => {
+  bot.onText(/^\/estadisticas$/, async (msg) => {
+    if (msg.chat.type !== 'channel') return;
 
-  const texto = `📈 *Estadísticas del Canal*
-
-👥 Miembros totales: ${memberCount} 📊 Actividad: próximamente...
-
-✨ Gracias por ser parte de este canal.`;
-
-await bot.sendMessage(msg.chat.id, texto, { parse_mode: 'Markdown' });
-} catch (e) {
-  console.error('[Error Estadísticas]', e);
-}
-
-}); };
+    try {
+      const memberCount = await bot.getChatMembersCount(msg.chat.id);
+      bot.sendMessage(msg.chat.id, `📈 *Estadísticas del Canal*\n\n👥 *Miembros:* ${memberCount}`, {
+        parse_mode: 'Markdown'
+      });
+    } catch (e) {
+      console.error("[Error]", e);
+      bot.sendMessage(msg.chat.id, `❌ No se pudo obtener las estadísticas. Puede que falten permisos.`);
+    }
+  });
+};
