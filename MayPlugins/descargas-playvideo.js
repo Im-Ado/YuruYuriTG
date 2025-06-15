@@ -77,6 +77,7 @@ module.exports = (bot) => {
         });
       } catch (videoError) {
         console.error("Error enviando video:", videoError);
+        console.log("Revisa la configuración del modulo @soymaycol/maytelegram");
         
         // Alternativa: enviar como documento
         try {
