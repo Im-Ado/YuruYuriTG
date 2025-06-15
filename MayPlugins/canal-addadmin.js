@@ -32,8 +32,11 @@ module.exports = (bot) => {
       console.error('[AddAdmin Error]', err);
       const errorMsg = err.response?.body?.description || err.message;
 
-      if (errorMsg.includes("not enough rights") || errorMsg.includes("can't promote chat member")) {
-        return bot.sendMessage(chatId, `❌ No tengo permisos suficientes para hacer eso en *${canal}* (⁠´⁠-⁠﹏⁠-⁠`⁠）`, {
+      if (
+        errorMsg.includes("not enough rights") ||
+        errorMsg.includes("can't promote chat member")
+      ) {
+        return bot.sendMessage(chatId, `❌ No tengo permisos suficientes para hacer eso en *${canal}* (⁠´⁠-⁠﹏⁠-⁠\`)`, {
           parse_mode: 'Markdown'
         });
       }
