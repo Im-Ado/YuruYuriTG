@@ -2,7 +2,6 @@ const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-// Creamos un objeto para rastrear handlers registrados
 global._registeredPlugins = global._registeredPlugins || {};
 
 module.exports = (bot) => {
@@ -29,25 +28,22 @@ module.exports = (bot) => {
         const fullPath = path.join(pluginDir, file);
 
         try {
-          // Si ya estaba registrado antes, eliminamos su caché
-          if (require.cache[require.resolve(fullPath)]) {
-            delete require.cache[require.resolve(fullPath)];
-          }
+          // 🔥 Elimina caché
+          delete require.cache[require.resolve(fullPath)];
 
-          // Si tenía handlers previos, los quitamos
+          // 🔥 Remueve handlers anteriores si existen
           if (global._registeredPlugins[file]) {
             for (const { regex, handler } of global._registeredPlugins[file]) {
-              bot._events.text = (bot._events.text || []).filter(h => h !== handler);
+              bot._textRegexpCallbacks = bot._textRegexpCallbacks.filter(cb => {
+                return cb.regexp.toString() !== regex.toString() || cb.callback !== handler;
+              });
             }
           }
 
           const plugin = require(fullPath);
-
-          // Capturamos los nuevos handlers
           const newHandlers = [];
           const originalOnText = bot.onText.bind(bot);
 
-          // Monkey patch para capturar qué regex se registra
           bot.onText = (regex, handler) => {
             newHandlers.push({ regex, handler });
             return originalOnText(regex, handler);
@@ -58,10 +54,7 @@ module.exports = (bot) => {
             reloaded.push(file);
           }
 
-          // Restauramos el método original
           bot.onText = originalOnText;
-
-          // Guardamos handlers por archivo
           global._registeredPlugins[file] = newHandlers;
 
         } catch (e) {
