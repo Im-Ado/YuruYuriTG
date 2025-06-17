@@ -12,57 +12,22 @@ module.exports = (bot) => {
       return bot.sendMessage(chatId, '❌ Solo el creador puede actualizar el bot.');
     }
 
-    bot.sendMessage(chatId, '🔄 Haciendo `git pull`...');
+    bot.sendMessage(chatId, '🔄 Haciendo `git pull` y reiniciando...');
 
     exec('git pull', async (err, stdout, stderr) => {
       if (err) {
         return bot.sendMessage(chatId, `❌ Error en git pull:\n${stderr}`);
       }
 
-      const pluginDir = path.resolve(__dirname, '..', 'MayPlugins');
-      const allFiles = fs.readdirSync(pluginDir).filter(f => f.endsWith('.js'));
+      // Envía mensaje de éxito antes de reiniciar
+      await bot.sendMessage(chatId, `✅ Bot actualizado con éxito. Reiniciando...`);
 
-      let reloaded = [];
+      // 🚀 Reinicia el proceso usando node
+      const entryFile = process.argv[1]; // archivo actual
+      exec(`node ${entryFile}`);
 
-      for (const file of allFiles) {
-        const fullPath = path.join(pluginDir, file);
-
-        try {
-          // 🔥 Elimina caché
-          delete require.cache[require.resolve(fullPath)];
-
-          // 🔥 Remueve handlers anteriores si existen
-          if (global._registeredPlugins[file]) {
-            for (const { regex, handler } of global._registeredPlugins[file]) {
-              bot._textRegexpCallbacks = bot._textRegexpCallbacks.filter(cb => {
-                return cb.regexp.toString() !== regex.toString() || cb.callback !== handler;
-              });
-            }
-          }
-
-          const plugin = require(fullPath);
-          const newHandlers = [];
-          const originalOnText = bot.onText.bind(bot);
-
-          bot.onText = (regex, handler) => {
-            newHandlers.push({ regex, handler });
-            return originalOnText(regex, handler);
-          };
-
-          if (typeof plugin === 'function') {
-            plugin(bot);
-            reloaded.push(file);
-          }
-
-          bot.onText = originalOnText;
-          global._registeredPlugins[file] = newHandlers;
-
-        } catch (e) {
-          bot.sendMessage(chatId, `⚠️ Error al recargar ${file}:\n${e.message}`);
-        }
-      }
-
-      bot.sendMessage(chatId, `✅ Bot actualizado sin reiniciar.\nComandos recargados:\n\`\`\`\n${reloaded.join('\n') || 'Ninguno'}\n\`\`\``);
+      // ☠️ Mata el proceso actual
+      process.exit(0);
     });
   });
 };
