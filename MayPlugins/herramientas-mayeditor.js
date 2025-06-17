@@ -62,7 +62,8 @@ module.exports = (bot) => {
 
     try {
       const profileResp = await fetch(profileUrl);
-      const buffer = await profileResp.buffer();
+      const arrayBuffer = await profileResp.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
       fs.writeFileSync(profilePath, buffer);
 
       await updateProgress(15);
