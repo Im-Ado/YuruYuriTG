@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
-const fetch = require('node-fetch');
 
 const videosMap = {
   '1': './videos/video1.mp4',
