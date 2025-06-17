@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
+ffmpeg.setFfprobePath('/usr/bin/ffprobe');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const videosMap = {
