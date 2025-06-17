@@ -47,11 +47,24 @@ module.exports = (bot) => {
     const tempDir = './temp';
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-    const profileUrl = msg.from.photo ? msg.from.photo : `https://raw.githubusercontent.com/The-King-Destroy/Adiciones/main/Contenido/1745522645448.jpeg`;
     const profilePath = path.join(tempDir, `pf_${userId}.jpg`);
     const outputPath = path.join(tempDir, `vid_${userId}_${Date.now()}.mp4`);
 
     const progressMsg = await bot.sendMessage(chatId, `🎥 Procesando video mágico tipo ${type}...\n▱▱▱▱▱▱▱▱▱▱ 0%`);
+    
+    // Obtener foto de perfil del usuario
+    let profileUrl = `https://raw.githubusercontent.com/The-King-Destroy/Adiciones/main/Contenido/1745522645448.jpeg`; // URL por defecto
+    
+    try {
+      const profilePhotos = await bot.getUserProfilePhotos(userId, { limit: 1 });
+      if (profilePhotos.total_count > 0) {
+        const fileId = profilePhotos.photos[0][0].file_id; // Tomar la foto más pequeña
+        const file = await bot.getFile(fileId);
+        profileUrl = `https://api.telegram.org/file/bot${bot.token}/${file.file_path}`;
+      }
+    } catch (error) {
+      console.log('No se pudo obtener la foto de perfil, usando imagen por defecto');
+    }
     
     // Variable para evitar actualizaciones duplicadas
     let lastProgress = -1;
