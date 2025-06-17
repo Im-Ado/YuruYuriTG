@@ -5,17 +5,17 @@ ffmpeg.setFfprobePath('/usr/bin/ffprobe');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const videosMap = {
-  '1': './videos/video1.mp4',
-  '2': './videos/video2.mp4',
-  '3': './videos/video3.mp4',
-  '4': './videos/video4.mp4',
-  '5': './videos/video5.mp4',
-  '6': './videos/video6.mp4',
-  '7': './videos/video7.mp4',
-  '8': './videos/video8.mp4',
-  '9': './videos/video9.mp4',
-  '10': './videos/video10.mp4'
-};
+    '1': './videos/lv_7507655713968164149_20250607160908.mp4',
+    '2': './videos/lv_7463895997605743933_20250607164555.mp4',
+    '3': './videos/lv_7404392617884028176_20250607165541.mp4',
+    '4': './videos/lv_7403812168765852946_20250607173804.mp4',
+    '5': './videos/lv_7495448057157340469_20250607164932.mp4',
+    '6': './videos/lv_7497686403254373693_20250607170616.mp4',
+    '7': './videos/lv_7507655713968164149_20250607160908.mp4',
+    '8': './videos/lv_7478259089345187125_20250608202445.mp4',
+    '9': './videos/lv_7504712502689746229_20250608202734.mp4',
+    '10': './videos/lv_7307348459189800197_20250609084922.mp4'
+}
 
 const usuarios = {}; // En vez de global.db, un simple objeto local
 
