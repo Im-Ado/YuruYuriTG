@@ -52,14 +52,33 @@ module.exports = (bot) => {
     const outputPath = path.join(tempDir, `vid_${userId}_${Date.now()}.mp4`);
 
     const progressMsg = await bot.sendMessage(chatId, `🎥 Procesando video mágico tipo ${type}...\n▱▱▱▱▱▱▱▱▱▱ 0%`);
+    
+    // Variable para evitar actualizaciones duplicadas
+    let lastProgress = -1;
+    const minProgressDiff = 5; // Actualizar solo si hay una diferencia mínima de 5%
 
     const updateProgress = async (percent) => {
+      // Evitar actualizaciones duplicadas o muy frecuentes
+      if (Math.abs(percent - lastProgress) < minProgressDiff) {
+        return;
+      }
+      
       const bars = Math.floor(percent / 10);
       const barString = '▰'.repeat(bars) + '▱'.repeat(10 - bars);
-      await bot.editMessageText(`🎥 Procesando video mágico tipo ${type}...\n${barString} ${percent}%`, {
-        chat_id: chatId,
-        message_id: progressMsg.message_id
-      });
+      const newText = `🎥 Procesando video mágico tipo ${type}...\n${barString} ${percent}%`;
+      
+      try {
+        await bot.editMessageText(newText, {
+          chat_id: chatId,
+          message_id: progressMsg.message_id
+        });
+        lastProgress = percent;
+      } catch (error) {
+        // Ignorar errores de "mensaje no modificado"
+        if (!error.message.includes('message is not modified')) {
+          console.error('Error actualizando progreso:', error.message);
+        }
+      }
     };
 
     try {
@@ -80,6 +99,8 @@ module.exports = (bot) => {
       await updateProgress(25);
 
       await new Promise((resolve, reject) => {
+        let lastReportedPercent = 25;
+        
         ffmpeg(inputVideoPath)
           .input(profilePath)
           .complexFilter([
@@ -101,7 +122,13 @@ module.exports = (bot) => {
           .on('progress', async progress => {
             if (progress.percent) {
               const percent = Math.min(25 + (progress.percent * 0.7), 95);
-              await updateProgress(Math.round(percent));
+              const roundedPercent = Math.round(percent);
+              
+              // Solo actualizar si hay una diferencia significativa
+              if (roundedPercent - lastReportedPercent >= minProgressDiff) {
+                await updateProgress(roundedPercent);
+                lastReportedPercent = roundedPercent;
+              }
             }
           })
           .on('end', async () => {
@@ -111,6 +138,17 @@ module.exports = (bot) => {
           .on('error', reject)
           .run();
       });
+
+      // Actualizar mensaje final
+      try {
+        await bot.editMessageText(`✅ Video procesado exitosamente!`, {
+          chat_id: chatId,
+          message_id: progressMsg.message_id
+        });
+      } catch (error) {
+        // Ignorar si no se puede actualizar el mensaje
+        console.log('No se pudo actualizar mensaje final');
+      }
 
       const videoBuffer = fs.readFileSync(outputPath);
 
@@ -127,10 +165,36 @@ module.exports = (bot) => {
       // Limpieza
       fs.unlinkSync(profilePath);
       fs.unlinkSync(outputPath);
+      
+      // Eliminar mensaje de progreso después de enviar el video
+      try {
+        await bot.deleteMessage(chatId, progressMsg.message_id);
+      } catch (error) {
+        // Ignorar si no se puede eliminar
+      }
+
     } catch (err) {
       console.error('❌ Error:', err.message);
       usuarios[userId].count--;
-      bot.sendMessage(chatId, `⚠️ Error procesando el video: ${err.message}`);
+      
+      // Actualizar mensaje de error
+      try {
+        await bot.editMessageText(`⚠️ Error procesando el video: ${err.message}`, {
+          chat_id: chatId,
+          message_id: progressMsg.message_id
+        });
+      } catch (error) {
+        // Si no se puede editar, enviar nuevo mensaje
+        bot.sendMessage(chatId, `⚠️ Error procesando el video: ${err.message}`);
+      }
+      
+      // Limpiar archivos temporales en caso de error
+      try {
+        if (fs.existsSync(profilePath)) fs.unlinkSync(profilePath);
+        if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+      } catch (cleanupError) {
+        console.error('Error limpiando archivos:', cleanupError.message);
+      }
     }
   });
 };
