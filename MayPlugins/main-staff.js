@@ -6,9 +6,9 @@ module.exports = (bot) => {
 
 > ✦ Creador: » [SoyMaycol, Wirk](tg://user?id=${msg.from.id})
 > ✦ Repositorio: » [Ver en GitHub](https://github.com/Im-Ado/YuruYuriTG/)
-> 🜸 Invocado por: » *${msg.from.first_name || "un mortal"}*
+> 🜸 Pedido por: » *${msg.from.first_name || "un mortal"}*
 
-> ⚠️ _No uses exorcistas sin permiso del staff_`;
+> ⚠️ No uses exorcistas sin permiso del staff`;
 
     bot.sendPhoto(chatId, 'https://files.catbox.moe/8vygls.jpeg', {
       caption,
