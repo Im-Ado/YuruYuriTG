@@ -31,21 +31,20 @@ module.exports = (bot) => {
 
     const decorado = `
 ╔════════════════════════╗
-   🌸 *𝕄𝕖𝕟𝕦́ 𝕄𝕒𝕝𝕕𝕚𝕥𝕠 𝕕𝕖 𝕄𝕒𝕪𝕓𝕠𝕥* 👻
+   🌸 *𝕄𝕖𝕟𝕦́ 𝕄𝕒𝕝𝕕𝕚𝕥𝕠 𝕕𝕖 YuruYuri* 👻
 ╚════════════════════════╝
 
-🚽 *Inodoro No. 7 dice:*  
-_“Estos son los conjuros que puedes invocar...”_
+*SoyMaycol & Wirk*
 
 ${lista}
 
 ☁️𓂃 ࣪˖ 💮 𝒮𝒾 𝓃ℴ 𝓊𝓈𝒶𝓈 𝓑𝓸𝓽 𝓬𝓞𝓷 𝓒𝓤𝓘𝓓𝓐𝓓𝓞...  
 ˗ˏˋ 𝐻𝒶𝓃𝒶𝓀ℴ 𝓅𝒹𝑒𝓇𝒾𝒶 𝒶𝓅𝒶𝓇𝑒𝒸ℯ𝓇 ˎˊ˗
 
-❀ ༘⋆*ೃ˚ Hanako te bendice con papel higiénico 🌸🧻
+❀ ༘⋆*ೃ˚ Te amoo!
 `;
 
-    await bot.sendPhoto(chatId, 'https://files.catbox.moe/vy4bx1.jpeg', {
+    await bot.sendPhoto(chatId, 'https://files.catbox.moe/f4ncyq.jpg', {
       caption: decorado,
       parse_mode: 'HTML'
     });
