@@ -13,7 +13,7 @@ module.exports = (bot) => {
     else saludo = '🌙 ¡Buenas noches';
 
     // 🖼 Imagen de bienvenida
-    const imagen = 'https://files.catbox.moe/ck08jl.jpeg';
+    const imagen = 'https://files.catbox.moe/syrs1e.jpg';
 
     // 💬 Mensaje con full estilo Hanako-kun
     const mensaje = `
@@ -21,12 +21,12 @@ module.exports = (bot) => {
    ${saludo}, *${nombre}* ✨
 ╚══════════════════════════════╝
 
-(⁠◍⁠•⁠ᴗ⁠•⁠◍⁠)⁠❤ Bienvenid@ a *MaycolAIUltraMD* 🎩
-Un bot con estilo 👻 Hanako-kun y magia kawaii~
+(⁠◍⁠•⁠ᴗ⁠•⁠◍⁠)⁠❤ Bienvenid@ a *YuruYuri* 😍
+Un bot con magia kawaii~
 
 ╭───────────────╮
-┃ 🧠 Creador: *SoyMaycol*
-┃ 🎮 Bot: *MaycolAIUltraMD*
+┃ 🧠 Creador: *SoyMaycol & Wirk*
+┃ 🎮 Bot: *YuruYuri*
 ┃ 🗨️ MayBot's: ¡Disponible!
 ╰───────────────╯
 
